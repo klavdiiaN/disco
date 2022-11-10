@@ -170,21 +170,21 @@ The Disco server runs as a single ExpressJS app. To install the dependencies, ru
 npm ci
 ```
 
-This server also requires the [discojs](../discojs/README.md) package. Make sure `discojs` is *built* before proceeding to the next steps, by following the [discojs readme](../discojs/README.md).
+This server also requires the [discojs](../discojs/README.md) package. Make sure `discojs` is *built* before proceeding to the next steps, by following the [discojs README](../discojs/README.md).
 
-### Running the Server Locally
+### Running the server locally
 
 From this folder, you can run the server on localhost:8080 with `npm run dev`. This runs via the `nodemon` package, so it automatically restarts the process after changes.
 
-### Testing the Server Locally
+### Testing the server locally
 
 To run sever unit testing run `npm run test`. Make sure you are not running a server at the same time as the test suite will run a server to test on. We use [mocha](https://mochajs.org/), [chai](https://www.chaijs.com/) and [supertest](https://github.com/visionmedia/supertest) for testing; respectively they are libraries: unit tests, assertions, and http testing.
 
-### Writing Your Own Tests
+### Writing your own tests
 
-Server tests are saved in the `tests/` folder with root as `server/`. All tests with `.ts` extension written in this folder will be tested. To see an example of how to write your own tests have a look at `tests/example.test.ts`. You can use this as a starting template for your own tests!
+Server tests are saved in the `tests/` folder with root as `server/`. All tests ending with the `.spec.ts` extension written in this folder will be tested. To see an example of how to write your own tests have a look at `tests/example.spec.ts`. You can use this as a starting template for your own tests!
 
-### Testing the Servers Before Deploying
+### Testing the servers before deploying
 
 The server is deployed inside a docker container, thus before deploying it, we can locally test the container to see if any new dependencies work (The container runs a 20.04 Ubuntu server). See [docker guide](https://docs.docker.com/get-started/) if you have not used docker and or need to install it.
 
@@ -221,7 +221,7 @@ Deployment files:
 
 - `app.yaml` - GAE app config file.
 - `Dockerfile` - Docker [commands](https://docs.docker.com/engine/reference/builder/) we specify.
-- `.dockerignore` - Files to ignore while building the image, e.g. `node_module/`.
+- `.dockerignore` - Files to ignore while building the image, e.g. `node_modules/`.
 
 To change the GAE app configuration, you can modify the file `app.yaml`.
 
@@ -255,11 +255,3 @@ In the docker container we specify the environment and what dependencies to inst
 2. npm run start
 
 The first line compiles the ts code into js, and the second one then runs the compiled code.
-
-### TypeScript
-
-We specify compiler options as well as what directories to use for ts in the `tsconfig.json`, we [extend](https://www.typescriptlang.org/tsconfig#extends) this config onto `tsconfig.prod.json` where we specify what we want for the production build.
-
-In the `tsconfig` we add the base esm module that we use as well as including the mocha types. In `tsconfig.prod.json` we further specify which source to use for building, specifically ignoring the `tests/` folder.
-
-tl;dr: `tsconfig.json` specifies the general setup for ts (including testing), `tsconfig.prod.json` adds production specific commands to `tsconfig.json`.
