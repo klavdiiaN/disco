@@ -135,14 +135,14 @@ All endpoints listed below are implemented as messages on a WebSocket, mounted o
 Message | From | To | Body | Action
 -|-|-|-|-
 `clientConnected` | Client | Server | — | Connect client `clientID` to task `taskID`
-`postWeightsToServer` | Both | Both | Model weight updates | Send model weight updates
+`postWeightsToServer` | Client | Server | Model weight updates | Send model weight updates
 `latestServerRound` | Both | Both | — | Get the current training round and model weight updates
 
 ### Decentralized Learning
 
 The server receives neither weight updates nor data, but keeps a list of available tasks and participants (clients) available for each task.
 
-All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/deai/:taskID/:clientID/` route.
+All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/deai/:taskID/:clientID/` route. It means the endpoints trigger their actions for task `taskID` as client `clientID`.
 
 Message | From | To | Body | Action
 -|-|-|-|-
@@ -156,8 +156,8 @@ For completeness, note that the Disco clients send the following messages to eac
 
 Messsage | Body | Action
 -|-|-
-`Weights` | |
-`Shares` | |
+`Weights` | | Send model weight updates to the peer
+`Shares` | | 
 `PartialSums` | |
 
 ## Development
