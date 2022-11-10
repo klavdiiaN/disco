@@ -164,13 +164,13 @@ Messsage | Body | Action
 
 ### Requirements
 
-The Disco server runs as a single ExpressJS app. To install the dependencies, run
+To install the dependencies, run
 
 ```sh
 npm ci
 ```
 
-This server also requires the [@epfml/discojs-node](https://github.com/epfml/disco/tree/develop/discojs/discojs-node/README.md) package. If you wish to develop the server with your own local changes brought to @epfml/discojs-node, first link (`npm link`) the `discojs/discojs-node` project. Then, make sure `discojs/discojs-node` is *built* before proceeding to the next steps, by following the [@epfml/discojs-node README](https://github.com/epfml/disco/tree/develop/discojs/README.md).
+This server also requires the [@epfml/discojs-node](https://github.com/epfml/disco/tree/develop/discojs/discojs-node/README.md) package. If you wish to develop the server with your own local changes brought to `@epfml/discojs-node`, link (`npm link`) the `discojs/discojs-node` project. Then, make sure `discojs/discojs-node` is *built* before proceeding to the next steps, by following the `@epfml/discojs-node` [README](https://github.com/epfml/disco/tree/develop/discojs/README.md).
 
 ### Running the server locally
 
@@ -182,7 +182,7 @@ To run sever unit testing run `npm run test`. Make sure you are not running a se
 
 ### Writing your own tests
 
-Server tests live in the `server/tests/` folder. All files ending with the `.spec.ts` extension written in this folder will be run as tests. To see an example of how to write your own tests have a look at `tests/example.spec.ts`. You can use this as a starting template for your own tests!
+Server tests live in the `server/tests/` folder. All files ending with the `.spec.ts` extension written in this folder will be run as tests. Simply write a new `your_own_test.spec.ts` file to include it in the testing pipeline.
 
 ### Testing the servers before deploying
 
