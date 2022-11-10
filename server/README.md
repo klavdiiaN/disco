@@ -1,5 +1,29 @@
 # Disco Server
 
+This project contains the server providing the APIs used by the decentralized and federated learning schemes available in `@epfml/discojs` and `@epfml/discojs-node`.
+
+## Federated Learning
+
+the server only receives model weights updates, it never receives any training data.
+
+The federated learning server keeps track of connected clients and weights from each client and communication round.
+
+## Decentralized Learning
+
+the server receives neither weight updates nor data, but helps keeping a list of available tasks and participants (clients) available for each task.
+
+## ML Tasks
+
+In both learning schemes, the Disco server provides the list of trainable ML tasks to the Disco clients of the network. An ML task consists in:
+- the model
+- the task parameters
+  
+Their deep learning model architectures together must be made available to peers, which is achieved via the following routing paths:
+
+### Creating a new task
+
+Adding a new task server-side can be done in several ways. See the [task documentation](https://github.com/epfml/disco/tree/develop/docs/TASK.md) for more information.
+
 ## Example Usage
 
 You can quickly try the default server with 
@@ -105,57 +129,83 @@ async function runServer() {
 runServer()
 ```
 
-## Servers
+## HTTP API Specifications
 
-### Helper server for federated and decentralized training
+### ML Tasks
 
-This directory contains the helper server providing the APIs used by the decentralized and federated learning available in `epfml/disco`.
-For federated learning, the helper server receives all weight updates (but never any training data). For decentralized training, the helper server never receives models or data, but helps keeping a list of available tasks, and participants (clients) available for each task, to help peering via `peerjs`.
+Route | Method | Body | Behavior
+-|-|-|-
+`/tasks` | GET | — | List of ML tasks (.json)
+`/tasks`  | POST | Valid ML task (*) | Add a new ML task
+`/tasks/:taskID/model.json` | GET | — | Download the model architecture file (.json) for task `taskID`
+`/tasks/:taskID/:weightsFile` | GET | — | Download the model weights file (.bin) for task `taskID`
+
+(*) See the [task documentation](https://github.com/epfml/disco/tree/develop/docs/TASK.md) for the exact expectations.
+
+### Federated Learning
+
+All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/feai/:taskID/:clientID/` route.
+
+Message | Body | Behavior
+-|-|-
+`Connect` | — | Connect client `clientID` to task `taskID`
+`Disconnect` | — | Disconnect client `clientID` from task `taskID`
+`PostAsyncWeights` | Serialized weights updates | Send model weights updates to `taskID`
+`GetAsyncRound` | — | Get the current training round of `taskID`
+`GetMetadata` | — | —
+`PostMetadata` | — | —
+
+### Decentralized Learning
+
+All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/deai/:taskID/:clientID/` route.
+
+Message | Body | Behavior
+-|-|-
+
+## Development
 
 ### Requirements
 
-The helper server is running as a single ExpressJS app. It mainly requires [Node](https://nodejs.org/en/), [Express](https://expressjs.com/), [PeerServer](https://github.com/peers/peerjs-server) and [Tensorflow](https://www.tensorflow.org/js).
+The Disco server runs as a single ExpressJS app. To install the dependencies, run
 
-To install the dependencies, run
-
-```
+```sh
 npm ci
 ```
 
 This server also requires the [discojs](../discojs/README.md) package. Make sure `discojs` is *built* before proceeding to the next steps, by following the [discojs readme](../discojs/README.md).
 
-### Running the server locally
+### Running the Server Locally
 
 From this folder, you can run the server on localhost:8080 with `npm run dev`. This runs via the `nodemon` package, so it automatically restarts the process after changes.
 
-### Testing the server locally
+### Testing the Server Locally
 
 To run sever unit testing run `npm run test`. Make sure you are not running a server at the same time as the test suite will run a server to test on. We use [mocha](https://mochajs.org/), [chai](https://www.chaijs.com/) and [supertest](https://github.com/visionmedia/supertest) for testing; respectively they are libraries: unit tests, assertions, and http testing.
 
-### Writing your own tests
+### Writing Your Own Tests
 
 Server tests are saved in the `tests/` folder with root as `server/`. All tests with `.ts` extension written in this folder will be tested. To see an example of how to write your own tests have a look at `tests/example.test.ts`. You can use this as a starting template for your own tests!
 
-### Testing the servers before deploying
+### Testing the Servers Before Deploying
 
 The server is deployed inside a docker container, thus before deploying it, we can locally test the container to see if any new dependencies work (The container runs a 20.04 Ubuntu server). See [docker guide](https://docs.docker.com/get-started/) if you have not used docker and or need to install it.
 
 To test the server do the following steps:
 
-```
+```sh
 sudo docker build -t disco-server .
 ```
 
 This builds the docker image, and then run it:
 
-```
+```sh
 sudo docker run -p 8080:8080 disco-server:latest
 ```
 
 > **⚠ WARNING: Using VPN while running docker**  
 > If you are running a, VPN docker might not properly work, e.g. `http://localhost:8080/` will result in `page not found`.
 
-### Deploying the server to the cloud
+### Deploying the Server to the Cloud
 
 #### Google App Engine
 
@@ -163,7 +213,7 @@ Google App Engine (GAE) creates an HTTPS certificate automatically, making this 
 
 Since we need to install some required dependencies we deploy using Docker, we do this by choosing:
 
-```
+```yml
 runtime: custom
 ```
 
@@ -183,7 +233,7 @@ Note that the size of the container can be quite large (e.g 600mb), if the allot
 
 To deploy the app on GAE, you can run the following command, where disco-313515 is the current PROJECT-ID:
 
-```
+```sh
 gcloud app deploy --project=deai-313515 app.yaml --version prod
 ```
 
@@ -208,104 +258,10 @@ In the docker container we specify the environment and what dependencies to inst
 
 The first line compiles the ts code into js, and the second one then runs the compiled code.
 
-### tsconfig
+### TypeScript
 
 We specify compiler options as well as what directories to use for ts in the `tsconfig.json`, we [extend](https://www.typescriptlang.org/tsconfig#extends) this config onto `tsconfig.prod.json` where we specify what we want for the production build.
 
 In the `tsconfig` we add the base esm module that we use as well as including the mocha types. In `tsconfig.prod.json` we further specify which source to use for building, specifically ignoring the `tests/` folder.
 
 tl;dr: `tsconfig.json` specifies the general setup for ts (including testing), `tsconfig.prod.json` adds production specific commands to `tsconfig.json`.
-
-## Disco Helper Server, for decentralized training
-
-### Components
-
-#### PeerJS helper server (for decentralized training)
-
-The PeerServer stores the entire list of connected peers, which the peers need to correctly communicate between one another. It centralizes the peer id generation, which is assigned to peers on connection. The server uses an API key, simply set to "api" for convenience (can be easily changed later on). The list of peers is publicly accessible through:
-
-- `/peerjs`: PeerServer home page
-- `/peerjs/api/peers`: list of connected peers (id)
-
-#### ML Tasks
-
-The list of ML training tasks available to disco clients are provided by this helper server. Their descriptions as well as their deep learning model architectures must be made available to peers, which is achieved via the following routing paths:
-
-- `/tasks`: JSON file containing meta-data (including task id) on all available training tasks
-- `/tasks/task_id/{model.json, weights.bin}`: Tensorflow neural network model files for the given task id (model architecture & initialization weights)
-
-Tasks are stored in `tasks.json`. The models are declared in `models.js`.
-
-#### Creating a new task
-
-Adding a new task server-side can easily be done by following the next steps:
-
-- add an entry to `tasks.json` with the task's parameters
-- add a `createModel` function to `models.js` with the task's model architecture and export it
-
-## Disco Helper Server, for federated training
-
-### Components
-
-#### Server
-
-The federated learning server keeps track of connected clients and weights from each client and communication round. It provides the following endpoints.
-
-- `GET` requests publicly available without prior connection
-
-  - connect client with ID `id` to task `task`
-    ```
-    URL: /connect/<task>/<id>
-    ```
-  - disconnect client with ID `id` from task `task`
-    ```
-    URL: /disconnect/<task>/<id>
-    ```
-  - access logs containing all training communication history made with the server (see POST requests below)
-    ```
-    URL: /logs?id=<id>&task=<task>&round=<round>
-    ```
-
-- `POST` requests with required prior connection and body `{ id, timestamp, [data]}`, where the client ID and request timestamp are required for logging
-  - client sends their individual weights `weights` for communication round `round` and task `task`.
-    ```
-    URL: /send_weights/<task>/<round>
-    Body: { id: String, timestamp: Date, weights: Buffer  }
-    ```
-  - client receives averaged weights for communication round `round` and task `task`
-    ```
-    URL: /receive_weights/<task>/<round>
-    Body: { id: String, timestamp: Date }
-    ```
-  - client sends their individual number of data samples `samples` for communication round `round` and task `task`
-    ```
-    URL: /send_nbsamples/<task>/<round>
-    Body: { id: String, timestamp: Date, samples: Number }
-    ```
-  - client receives the number of data samples per client ID for communication round `round` and task `task`
-    ```
-    URL: /receive_data_info/<task>/<round>
-    Body: { id: String, timestamp: Date }
-    ```
-
-#### ML Tasks
-
-The list of ML training tasks available to clients is provided by this helper server. Their descriptions as well as their deep learning model architectures must be made available to all clients, which is achieved via the following `GET` request routes.
-
-- JSON file containing meta-data (including task id) on all available training tasks
-  ```
-  URL: /tasks
-  ```
-- Tensorflow neural network model files for the given task `task` (model architecture & initialization weights)
-  ```
-  URL: /tasks/<task>/{model.json, weights.bin}
-  ```
-
-Tasks are stored in `tasks.json`. The models are declared in `models.js`.
-
-#### Creating a new task
-
-Adding a new task server-side can easily be done by following the next steps:
-
-- add an entry to `tasks.json` with the task's parameters
-- add a `createModel` function to `models.js` with the task's model architecture and export it
