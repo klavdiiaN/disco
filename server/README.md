@@ -2,28 +2,6 @@
 
 This project contains the server providing the APIs used by the decentralized and federated learning schemes available in `@epfml/discojs` and `@epfml/discojs-node`.
 
-## Federated Learning
-
-the server only receives model weights updates, it never receives any training data.
-
-The federated learning server keeps track of connected clients and weights from each client and communication round.
-
-## Decentralized Learning
-
-the server receives neither weight updates nor data, but helps keeping a list of available tasks and participants (clients) available for each task.
-
-## ML Tasks
-
-In both learning schemes, the Disco server provides the list of trainable ML tasks to the Disco clients of the network. An ML task consists in:
-- the model
-- the task parameters
-  
-Their deep learning model architectures together must be made available to peers, which is achieved via the following routing paths:
-
-### Creating a new task
-
-Adding a new task server-side can be done in several ways. See the [task documentation](https://github.com/epfml/disco/tree/develop/docs/TASK.md) for more information.
-
 ## Example Usage
 
 You can quickly try the default server with 
@@ -133,9 +111,15 @@ runServer()
 
 ### ML Tasks
 
-Route | Method | Body | Behavior
+In both learning schemes, the Disco server provides the list of trainable ML tasks to the Disco clients of the network. An ML task consists in:
+- the model
+- the task parameters
+
+Adding a new task server-side can be done in several ways. See the [task documentation](https://github.com/epfml/disco/tree/develop/docs/TASK.md) for more information.
+
+Route | Method | Body | Action
 -|-|-|-
-`/tasks` | GET | — | List of ML tasks (.json)
+`/tasks` | GET | — | Get the list of ML tasks (.json)
 `/tasks`  | POST | Valid ML task (*) | Add a new ML task
 `/tasks/:taskID/model.json` | GET | — | Download the model architecture file (.json) for task `taskID`
 `/tasks/:taskID/:weightsFile` | GET | — | Download the model weights file (.bin) for task `taskID`
@@ -144,23 +128,37 @@ Route | Method | Body | Behavior
 
 ### Federated Learning
 
-All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/feai/:taskID/:clientID/` route.
+The server receives model weights updates from participants (clients), but never receives any training data. For every task, it keeps track of connected clients and weight updates, and periodically aggregates and serves the most recent weight updates.
 
-Message | Body | Behavior
--|-|-
-`Connect` | — | Connect client `clientID` to task `taskID`
-`Disconnect` | — | Disconnect client `clientID` from task `taskID`
-`PostAsyncWeights` | Serialized weights updates | Send model weights updates to `taskID`
-`GetAsyncRound` | — | Get the current training round of `taskID`
-`GetMetadata` | — | —
-`PostMetadata` | — | —
+All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/feai/:taskID/:clientID/` route. It means the endpoints trigger their actions for task `taskID` as client `clientID`.
+
+Message | From | To | Body | Action
+-|-|-|-|-
+`clientConnected` | Client | Server | — | Connect client `clientID` to task `taskID`
+`postWeightsToServer` | Both | Both | Model weight updates | Send model weight updates
+`latestServerRound` | Both | Both | — | Get the current training round and model weight updates
 
 ### Decentralized Learning
 
+The server receives neither weight updates nor data, but keeps a list of available tasks and participants (clients) available for each task.
+
 All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/deai/:taskID/:clientID/` route.
 
-Message | Body | Behavior
+Message | From | To | Body | Action
+-|-|-|-|-
+`clientConnected` | Client | Server | — | Connect client `clientID` to task `taskID`
+`SignalForPeer` | Client | Server | 
+`PeerIsReady` | Client | Server | 
+`PeerID` | Server | Client | 
+`PeersForRound` | Server | Client | 
+
+For completeness, note that the Disco clients send the following messages to each other in a peer-to-peer fashion, i.e. without any intervention from the server.
+
+Messsage | Body | Action
 -|-|-
+`Weights` | |
+`Shares` | |
+`PartialSums` | |
 
 ## Development
 
