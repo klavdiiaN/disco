@@ -1,6 +1,6 @@
 # Disco Server
 
-This project contains the server providing the APIs used by the decentralized and federated learning schemes available in `@epfml/discojs` and `@epfml/discojs-node`.
+This project contains the helper server providing the APIs used by the decentralized and federated learning schemes available in `@epfml/discojs` and `@epfml/discojs-node`.
 
 ## Example Usage
 
@@ -11,9 +11,9 @@ npm install -g @epfml/disco-server
 disco-server
 ```
 
-This will only load the default disco tasks, and there are currently no way to add new tasks from the server CLI.
+The above command will load the default Disco tasks.
 
-Or use this package to make you server and add your own tasks:
+If you want to add a new custom task via the server CLI, use the following package instead:
 
 ```sh
 npm install @epfml/disco-server
@@ -111,9 +111,9 @@ runServer()
 
 ### ML Tasks
 
-In both learning schemes, the Disco server provides the list of trainable ML tasks to the Disco clients of the network. An ML task consists in:
-- the model
-- the task parameters
+In both learning schemes, the Disco server provides a list of trainable ML tasks to the Disco clients of the network. An ML task consists of:
+- the neural network model
+- the task parameters (such as descriptions, preprocessing, training modes)
 
 Adding a new task server-side can be done in several ways. See the [task documentation](https://github.com/epfml/disco/tree/develop/docs/TASK.md) for more information.
 
@@ -128,7 +128,7 @@ Route | Method | Body | Action
 
 ### Federated Learning
 
-The server receives model weights updates from participants (clients), but never receives any training data. For every task, it keeps track of connected clients and weight updates, and periodically aggregates and serves the most recent weight updates.
+The server receives model weight updates from participants (clients), but never receives any training data. For every task, it keeps track of connected clients and weight updates, and periodically aggregates and serves the most recent weight updates.
 
 All endpoints listed below are implemented as messages on a WebSocket, mounted on the `/feai/:taskID/:clientID/` route. It means the endpoints trigger their actions for task `taskID` as client `clientID`.
 
@@ -157,8 +157,8 @@ For completeness, note that the Disco clients send the following messages to eac
 Messsage | Body | Action
 -|-|-
 `Weights` | | Send model weight updates to the peer
-`Shares` | | 
-`PartialSums` | |
+`Shares` | | Secure Aggregation: Secret shares sent in first round
+`PartialSums` | | Secure Aggregation: Partial sums sent in second round
 
 ## Development
 
