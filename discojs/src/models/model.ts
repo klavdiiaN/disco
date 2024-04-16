@@ -1,7 +1,6 @@
 import type tf from "@tensorflow/tfjs";
 
 import type { WeightsContainer } from "../index.js";
-import type { Dataset } from "../dataset/index.js";
 
 export interface EpochLogs {
   epoch: number; // first epoch is zero
@@ -43,8 +42,8 @@ export abstract class Model implements Disposable{
    * @yields on every epoch, training can be stop by `return`ing it
    */
   abstract train(
-    trainingData: Dataset,
-    validationData?: Dataset,
+    trainingData: tf.data.Dataset<tf.TensorContainer>,
+    validationData?: tf.data.Dataset<tf.TensorContainer>,
     epochs?: number,
   ): AsyncGenerator<EpochLogs, void>;
 
