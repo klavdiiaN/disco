@@ -1,7 +1,8 @@
-import type { data, Logger, Memory, Task, TrainingInformation } from '../index.js'
-import { client as clients, EmptyMemory, ConsoleLogger } from '../index.js'
+import { Logger, Memory, Task, TrainingInformation, TypedDataset } from '../index.js'
+import { client as clients, data, EmptyMemory, ConsoleLogger } from '../index.js'
 import type { Aggregator } from '../aggregator/index.js'
 import { MeanAggregator } from '../aggregator/mean.js'
+import { datasetToDataSplit } from '../dataset/dataset.js'
 
 import type { RoundLogs, Trainer } from './trainer/trainer.js'
 import { TrainerBuilder } from './trainer/trainer_builder.js'
@@ -85,16 +86,18 @@ export class Disco {
    * @param dataTuple The data tuple
    */
   // TODO RoundLogs should contain number of participants but Trainer doesn't need client
-  async *fit(dataTuple: data.DataSplit): AsyncGenerator<RoundLogs & { participants: number }> {
+  async *fit(dataset: data.DataSplit | TypedDataset): AsyncGenerator<RoundLogs & { participants: number }> {
     this.logger.success("Training started.");
 
-    const trainData = dataTuple.train.preprocess().batch();
-    const validationData =
-      dataTuple.validation?.preprocess().batch() ?? trainData;
+    if (Array.isArray(dataset))
+      dataset = await datasetToDataSplit(this.task, dataset)
+    const trainData = dataset.train.preprocess().batch().dataset;
+    const validationData = dataset.validation?.preprocess().batch().dataset ?? trainData;
+
     await this.client.connect();
     const trainer = await this.trainer;
 
-    for await (const roundLogs of trainer.fitModel(trainData.dataset, validationData.dataset)) {
+    for await (const roundLogs of trainer.fitModel(trainData, validationData)) {
       let msg = `Round: ${roundLogs.round}\n`
       for (const epochLogs of roundLogs.epochs.values()) {
         msg += `    Epoch: ${epochLogs.epoch}\n`
@@ -113,6 +116,11 @@ export class Disco {
         ...roundLogs,
         participants: this.client.nodes.size + 1 // add ourself
       }
+    }
+
+    if (Array.isArray(data)) {
+      await trainData.forEachAsync(() => {})
+      await validationData.forEachAsync(() => {})
     }
 
     this.logger.success("Training finished.");

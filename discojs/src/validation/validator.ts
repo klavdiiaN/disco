@@ -1,7 +1,8 @@
 import { List } from 'immutable'
 import * as tf from '@tensorflow/tfjs'
 
-import type { data, Model, Task, Logger, client as clients, Memory, ModelSource, Features } from '../index.js'
+import type { Model, Task, Logger, client as clients, data, Memory, ModelSource, Features, TypedDataset } from '../index.js'
+import { datasetToData } from '../dataset/dataset.js'
 
 export class Validator {
   private size = 0
@@ -39,15 +40,17 @@ export class Validator {
   }
 
   // test assumes data comes with labels while predict doesn't
-  async *test(data: data.Data):
+  async *test(dataset: data.Data | TypedDataset):
     AsyncGenerator<Array<{ groundTruth: number, pred: number, features: Features }>, void> {
-    const batchSize = this.task.trainingInformation?.batchSize
-    if (batchSize === undefined) {
-      throw new TypeError('Batch size is undefined')
-    }
+    if (Array.isArray(dataset))
+      dataset = await datasetToData(this.task, dataset)
+    const batched = dataset
+      .preprocess()
+      .dataset.batch(this.task.trainingInformation.batchSize);
+
     const model = await this.getModel()
     let hits = 0
-    const iterator = await data.preprocess().dataset.batch(batchSize).iterator()
+    const iterator = await batched.iterator()
     let next = await iterator.next()
     while (next.done !== true) {
       const { xs, ys } = next.value as { xs: tf.Tensor2D, ys: tf.Tensor3D }
@@ -71,14 +74,15 @@ export class Validator {
     this.logger.success(`Visited ${this.visitedSamples} samples`)
   }
 
-  async *inference (data: data.Data): AsyncGenerator<Array<{ features: Features, pred: number }>, void> {
-    const batchSize = this.task.trainingInformation?.batchSize
-    if (batchSize === undefined) {
-      throw new TypeError('Batch size is undefined')
-    }
+  async *inference (dataset: data.Data | TypedDataset): AsyncGenerator<Array<{ features: Features, pred: number }>, void> {
+    if (Array.isArray(dataset))
+      dataset = await datasetToData(this.task, dataset)
+    const batched = dataset
+      .preprocess()
+      .dataset.batch(this.task.trainingInformation.batchSize);
 
     const model = await this.getModel()
-    const iterator = await data.preprocess().dataset.batch(batchSize).iterator()
+    const iterator = await batched.iterator()
     let next = await iterator.next()
 
     while (next.done !== true) {
