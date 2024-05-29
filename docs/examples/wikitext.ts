@@ -1,9 +1,8 @@
-import type { Task } from '@epfml/discojs'
 import {
-  Disco, fetchTasks, data, client as clients,
+  Disco, fetchTasks, client as clients,
   aggregator as aggregators, models
 } from '@epfml/discojs'
-import { NodeTextLoader, saveModelToDisk, loadModelFromDisk } from '@epfml/discojs-node'
+import { saveModelToDisk, loadModelFromDisk, loadText } from '@epfml/discojs-node'
 
 
 async function main(): Promise<void> { 
@@ -23,13 +22,15 @@ async function main(): Promise<void> {
   const TRAIN_MODEL = true
   if (TRAIN_MODEL) {
     // Load the wikitext dataset from the `datasets` folder
-    const dataset = await loadWikitextData(task)
+    const dataset = loadText("../../datasets/wikitext/wiki.train.tokens").chain(
+      loadText("../../datasets/wikitext/wiki.valid.tokens"),
+    );
   
     // Initialize a Disco instance and start training a language model
     const aggregator = new aggregators.MeanAggregator()
     const client = new clients.federated.FederatedClient(url, task, aggregator)
     const disco = new Disco(task, { scheme: 'federated', client, aggregator })
-    for await (const _ of disco.fit(dataset));
+    for await (const _ of disco.fit(["text", dataset]));
   
     // Get the model and complete the prompt
     if (aggregator.model === undefined) {
@@ -49,15 +50,6 @@ async function main(): Promise<void> {
   const prompt = 'The game began development in 2010 , carrying over a large portion'
   const generation = await model.generate(prompt, tokenizer)
   console.log(generation)
-}
-
-async function loadWikitextData (task: Task): Promise<data.DataSplit> {
-  const loader = new NodeTextLoader(task)
-  const dataSplit: data.DataSplit = {
-    train: await data.TextData.init(await loader.load('../../datasets/wikitext/wiki.train.tokens', {shuffle: true}), task),
-    validation: await data.TextData.init(await loader.load('../../datasets/wikitext/wiki.valid.tokens', {shuffle: true}), task)
-  }
-  return dataSplit
 }
 
 // You can run this example with "npm start" from this folder
