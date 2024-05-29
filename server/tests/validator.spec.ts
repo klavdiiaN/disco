@@ -68,7 +68,7 @@ describe('validator', function () {
     const files = ['../datasets/titanic_train.csv']
     const data: data.Data = (await new NodeTabularLoader(titanicTask, ',').loadAll(files, {
       features: titanicTask.trainingInformation.inputColumns,
-      labels: titanicTask.trainingInformation.outputColumns,
+      labels: [titanicTask.trainingInformation.outputColumn as string],
       shuffle: false
     })).train
     const meanAggregator = new aggregator.MeanAggregator()

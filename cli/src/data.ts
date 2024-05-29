@@ -51,7 +51,7 @@ async function titanicData (titanic: Task): Promise<data.DataSplit> {
     ['file://'.concat(dir)],
     {
       features: titanic.trainingInformation?.inputColumns,
-      labels: titanic.trainingInformation?.outputColumns,
+      labels: [titanic.trainingInformation?.outputColumn as string],
       shuffle: false
     }
   ))

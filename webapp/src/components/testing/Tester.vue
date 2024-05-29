@@ -342,7 +342,7 @@ async function modelInference (): Promise<void> {
           if (props.task.trainingInformation.inputColumns === undefined) {
             throw new Error("no input columns but CSV needs it")
           }
-          featuresNames.value = [...props.task.trainingInformation.inputColumns, 'Predicted_' + props.task.trainingInformation.outputColumns]
+          featuresNames.value = [...props.task.trainingInformation.inputColumns, `Predicted_${props.task.trainingInformation.outputColumn}`]
           dataWithPred.value = runningPredictions.map(pred => ({ data: [...(pred.features as number[]), pred.pred] }))
           break;
         case 'text':
@@ -411,7 +411,7 @@ async function testModel(): Promise<void> {
           if (props.task.trainingInformation.inputColumns === undefined) {
             throw new Error("no input columns but CSV needs it")
           }
-          featuresNames.value = [...props.task.trainingInformation.inputColumns, 'Predicted_' + props.task.trainingInformation.outputColumns, 'Target_' + props.task.trainingInformation.outputColumns]
+          featuresNames.value = [...props.task.trainingInformation.inputColumns, `Predicted_${props.task.trainingInformation.outputColumn}`, `Target_${props.task.trainingInformation.outputColumn}`]
           dataWithPred.value = runningResults.map(pred => ({
             data: [...(pred.features as number[]),
             pred.pred, pred.groundTruth]

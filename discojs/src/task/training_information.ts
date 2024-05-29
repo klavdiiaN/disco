@@ -20,8 +20,8 @@ export interface TrainingInformation {
   dataType: 'image' | 'tabular' | 'text'
   // inputColumns: for tabular data, the columns to be chosen as input data for the model
   inputColumns?: string[]
-  // outputColumns: for tabular data, the columns to be predicted by the model
-  outputColumns?: string[]
+  // outputColumn: for tabular data, the column to be predicted by the model
+  outputColumn?: string
   // IMAGE_H height of image (or RESIZED_IMAGE_H if ImagePreprocessing.Resize in preprocessingFunctions)
   IMAGE_H?: number
   // IMAGE_W width of image (or RESIZED_IMAGE_W if ImagePreprocessing.Resize in preprocessingFunctions)
@@ -90,7 +90,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     minimumReadyPeers,
     modelID,
     noiseScale,
-    outputColumns,
+    outputColumn,
     preprocessingFunctions,
     roundDuration,
     scheme,
@@ -115,11 +115,11 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     (maxShareValue !== undefined && typeof maxShareValue !== 'number') ||
     (minimumReadyPeers !== undefined && typeof minimumReadyPeers !== 'number') ||
     (noiseScale !== undefined && typeof noiseScale !== 'number') ||
+    (outputColumn !== undefined && typeof outputColumn !== 'string') ||
     (IMAGE_H !== undefined && typeof IMAGE_H !== 'number') ||
     (IMAGE_W !== undefined && typeof IMAGE_W !== 'number') ||
     (LABEL_LIST !== undefined && !isStringArray(LABEL_LIST)) ||
     (inputColumns !== undefined && !isStringArray(inputColumns)) ||
-    (outputColumns !== undefined && !isStringArray(outputColumns)) ||
     (preprocessingFunctions !== undefined && !Array.isArray(preprocessingFunctions))
   ) {
     return false
@@ -141,9 +141,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     if (!(Array.isArray(inputColumns) && inputColumns.every((e) => typeof e === 'string'))) {
       return false
     }
-    if (!(Array.isArray(outputColumns) && outputColumns.every((e) => typeof e === 'string'))) {
-      return false
-    }
+    if (outputColumn === undefined) return false
   }
 
   switch (tensorBackend) {
@@ -174,7 +172,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     minimumReadyPeers,
     modelID,
     noiseScale,
-    outputColumns,
+    outputColumn,
     preprocessingFunctions,
     roundDuration,
     scheme,

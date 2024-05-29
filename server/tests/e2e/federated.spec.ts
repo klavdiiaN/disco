@@ -57,7 +57,7 @@ describe("end-to-end federated", function () {
       files,
       {
         features: titanicTask.trainingInformation.inputColumns,
-        labels: titanicTask.trainingInformation.outputColumns,
+        labels: [titanicTask.trainingInformation.outputColumn as string],
         shuffle: false
       }
     ))
