@@ -1,5 +1,5 @@
 import { Logger, Memory, Task, TrainingInformation, TypedDataset } from '../index.js'
-import { client as clients, data, EmptyMemory, ConsoleLogger } from '../index.js'
+import { client as clients, EmptyMemory, ConsoleLogger } from '../index.js'
 import type { Aggregator } from '../aggregator/index.js'
 import { MeanAggregator } from '../aggregator/mean.js'
 import { datasetToDataSplit } from '../dataset/dataset.js'
@@ -86,13 +86,12 @@ export class Disco {
    * @param dataTuple The data tuple
    */
   // TODO RoundLogs should contain number of participants but Trainer doesn't need client
-  async *fit(dataset: data.DataSplit | TypedDataset): AsyncGenerator<RoundLogs & { participants: number }> {
+  async *fit(dataset: TypedDataset): AsyncGenerator<RoundLogs & { participants: number }> {
     this.logger.success("Training started.");
 
-    if (Array.isArray(dataset))
-      dataset = await datasetToDataSplit(this.task, dataset)
-    const trainData = dataset.train.preprocess().batch().dataset;
-    const validationData = dataset.validation?.preprocess().batch().dataset ?? trainData;
+    const data = await datasetToDataSplit(this.task, dataset)
+    const trainData = data.train.preprocess().batch().dataset;
+    const validationData = data.validation?.preprocess().batch().dataset ?? trainData;
 
     await this.client.connect();
     const trainer = await this.trainer;
