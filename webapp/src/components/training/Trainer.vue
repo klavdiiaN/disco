@@ -54,7 +54,7 @@ import IconCard from "@/components/containers/IconCard.vue";
 
 const props = defineProps<{
   task: Task;
-  dataset: TypedDataset;
+  dataset?: TypedDataset;
 }>();
 
 const toaster = useToaster();
@@ -72,6 +72,13 @@ const hasValidationData = computed(
 );
 
 async function startTraining(distributed: boolean): Promise<void> {
+  // Vue proxy doesn't work with Dataset's private fields
+  const dataset = toRaw(props.dataset);
+  if (dataset === undefined) {
+    toaster.error("First connect your data at the previous step.");
+    return;
+  }
+
   // Reset training information before starting a new training
   trainingGenerator.value = undefined;
   logs.value = List<RoundLogs & { participants: number }>();
@@ -98,8 +105,7 @@ async function startTraining(distributed: boolean): Promise<void> {
 
   try {
     displayModelCaching.value = false; // hide model caching buttons during training
-    // Vue proxy doesn't work with Dataset's private fields
-    trainingGenerator.value = disco.fit(toRaw(props.dataset));
+    trainingGenerator.value = disco.fit(dataset);
     logs.value = List<RoundLogs & { participants: number }>();
     for await (const roundLogs of trainingGenerator.value)
       logs.value = logs.value.push(roundLogs);

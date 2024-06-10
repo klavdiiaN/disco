@@ -10,7 +10,7 @@
     />
 
     <Trainer
-      v-else-if="trainingStore.step === 3 && dataset !== undefined"
+      v-else-if="trainingStore.step === 3"
       :task="task"
       :dataset="dataset"
     />
