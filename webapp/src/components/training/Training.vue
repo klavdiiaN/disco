@@ -1,21 +1,21 @@
 <template>
   <div v-if="task === undefined">loading task</div>
   <div v-else>
-    <Description v-if="trainingStore.step === 1" :task="task" />
+    <Description v-show="trainingStore.step === 1" :task="task" />
 
     <Data
-      v-else-if="trainingStore.step === 2"
+      v-show="trainingStore.step === 2"
       :task="task"
       @dataset="setDataset"
     />
 
     <Trainer
-      v-else-if="trainingStore.step === 3"
+      v-show="trainingStore.step === 3"
       :task="task"
       :dataset="dataset"
     />
 
-    <Finished v-else-if="trainingStore.step === 4" :task="task" />
+    <Finished v-show="trainingStore.step === 4" :task="task" />
   </div>
 </template>
 

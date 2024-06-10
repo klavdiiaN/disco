@@ -140,7 +140,7 @@ const props = defineProps<{
   labels: Set<string>;
 }>();
 const emit = defineEmits<{
-  dataset: [dataset: NamedLabeledImageDataset];
+  dataset: [dataset: NamedLabeledImageDataset | undefined];
 }>();
 
 interface CSVRow {
@@ -202,6 +202,7 @@ async function setCSV(files: Set<File> | undefined): Promise<void> {
 function setLabeledFiles(files: Set<File> | undefined, label: string): void {
   if (files === undefined) {
     labeledFiles.value = labeledFiles.value.delete(label);
+    emit("dataset", undefined);
     return;
   }
 
@@ -226,6 +227,7 @@ function setLabeledFiles(files: Set<File> | undefined, label: string): void {
 function setFolder(files: Set<File> | undefined): void {
   if (files === undefined) {
     labeledFiles.value = Map();
+    emit("dataset", undefined);
     return;
   }
 
