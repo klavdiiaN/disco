@@ -5,6 +5,7 @@ import {
   convert_to_number,
   extract_column as extract_column,
   index_in_list,
+  remove_alpha,
 } from "../convertors.js";
 import type { Task } from "../task/task.js";
 import type { DataSplit } from "./data/data_split.js";
@@ -180,7 +181,10 @@ export async function datasetToData(
   switch (t) {
     case "image": {
       const converted = dataset
-        .map(([image, label]) => [image, index_in_list(label, labels)] as const)
+        .map(
+          ([image, label]) =>
+            [remove_alpha(image), index_in_list(label, labels)] as const,
+        )
         .map(
           ([image, label]) =>
             ({

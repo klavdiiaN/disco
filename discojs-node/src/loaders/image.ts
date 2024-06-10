@@ -5,15 +5,14 @@ import * as fs from "node:fs/promises";
 import { Dataset, Image } from "@epfml/discojs";
 
 export async function load(path: string): Promise<Image> {
-  const { data, info } = await sharp(path).removeAlpha().raw().toBuffer({
+  const { data, info } = await sharp(path).raw().toBuffer({
     resolveWithObject: true,
   });
 
-  return {
-    data,
-    width: info.width,
-    height: info.height,
-  };
+  if (info.channels === 1 || info.channels === 2)
+    throw new Error("unsupported channel count");
+
+  return new Image(data, info.width, info.height, info.channels);
 }
 
 export async function loadAllInDir(dir: string): Promise<Dataset<Image>> {

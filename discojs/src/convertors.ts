@@ -1,5 +1,6 @@
 import { PreTrainedTokenizer } from "@xenova/transformers";
 import { List } from "immutable";
+import { Image } from "./dataset/image.js";
 
 export function convert_to_number(raw: string): number {
   const num = Number.parseFloat(raw);
@@ -66,4 +67,20 @@ export function tokenize_and_left_pad(
   const padded = padding.concat(tokens);
 
   return padded;
+}
+
+export function remove_alpha<W extends number, H extends number>(
+  image: Image<3 | 4, W, H>,
+): Image<3, W, H> {
+  switch (image.depth) {
+    case 3:
+      return new Image(image.data, image.width, image.height, 3);
+    case 4:
+      return new Image(
+        image.data.filter((_, i) => i % 4 !== 3),
+        image.width,
+        image.height,
+        3,
+      );
+  }
 }
