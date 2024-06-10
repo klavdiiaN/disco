@@ -15,19 +15,17 @@
           @drop="dragFiles"
         >
           <p class="p-4 text-lg text-disco-blue flex-wrap justify-center">
-            <span>Drag and drop your</span>&nbsp;<span
-              >file{{ isMultiple ? "s" : "" }} or</span
-            >
+            <span> Drag and drop your file{{ multiple ? "s" : "" }} </span>
           </p>
           <label class="mb-6">
             <span
               class="px-4 py-2 min-w-[8rem] text-lg uppercase text-white bg-disco-cyan rounded duration-200 hover:bg-white hover:outline hover:outline-disco-cyan hover:outline-2 hover:text-disco-cyan hover:cursor-pointer"
             >
               select
-              {{ isDirectory ? "folder" : "file" + (isMultiple ? "s" : "") }}
+              {{ multiple ? multiple : "file" }}
             </span>
             <input
-              v-if="isDirectory"
+              v-if="multiple === 'folder'"
               ref="uploadDirectory"
               type="file"
               multiple
@@ -40,7 +38,7 @@
               v-else
               ref="uploadFile"
               type="file"
-              :multiple="isMultiple"
+              :multiple="multiple === 'files'"
               :accept="acceptFiles.join(',')"
               class="hidden"
               @change="submitFiles"
@@ -48,10 +46,8 @@
           </label>
         </header>
 
-        <div v-if="infoText" class="mt-4 md:mt-8 flex justify-centerz">
-          <p class="text-slate-500 text-sm">
-            Note: <span><slot name="text" /></span>
-          </p>
+        <div v-if="$slots.default" class="mt-4 md:mt-8 flex justify-centerz">
+          <p class="text-slate-500 text-sm">Note: <slot /></p>
         </div>
 
         <!-- If preview of the selected file, display of small preview of selected files -->
@@ -69,21 +65,21 @@
             v-if="selectedFiles?.length"
             class="mb-4 flex justify-center items-center text-center md:text-left sm:text-lg text-disco-blue"
           >
-            <span v-if="isMultiple"
-              >Number of selected files:
-              <span class="pl-1 text-xl">{{
-                selectedFiles?.length ?? 0
-              }}</span></span
-            >
-            <span v-else
-              >Selected file:
-              <span class="pl-1">{{
-                selectedFiles?.[0]?.name ?? "none"
-              }}</span></span
-            >
+            <span v-if="!multiple">
+              Selected file:
+              <span class="pl-1">
+                {{ selectedFiles?.[0]?.name ?? "none" }}
+              </span>
+            </span>
+            <span v-else>
+              Number of selected files:
+              <span class="pl-1 text-xl">
+                {{ selectedFiles?.length ?? 0 }}
+              </span>
+            </span>
           </div>
           <CustomButton @click="clearFiles">
-            clear file{{ isMultiple ? "s" : "" }}
+            clear file{{ multiple ? "s" : "" }}
           </CustomButton>
         </div>
       </section>
@@ -103,16 +99,12 @@ const emit = defineEmits<{
 
 withDefaults(
   defineProps<{
-    isDirectory?: boolean;
-    isMultiple?: boolean; // TODO how much logical crossing w/ isDirectory
+    multiple?: false | "files" | "folder";
     acceptFiles?: string[];
-    infoText?: boolean;
   }>(),
   {
-    isDirectory: false,
-    isMultiple: true,
+    multiple: false,
     acceptFiles: () => ["*"],
-    infoText: false,
   },
 );
 

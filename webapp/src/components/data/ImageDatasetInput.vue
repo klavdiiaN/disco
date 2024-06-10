@@ -46,7 +46,10 @@ If the task has few labels then the default is to connect by group, otherwise co
               Group label:&nbsp;&nbsp;&nbsp;"{{ label }}"
             </template>
             <template #content>
-              <FileSelection @files="setLabeledFiles($event, label)" />
+              <FileSelection
+                multiple="files"
+                @files="setLabeledFiles($event, label)"
+              />
             </template>
           </IconCard>
         </div>
@@ -63,22 +66,17 @@ If the task has few labels then the default is to connect by group, otherwise co
               Load the CSV file containing a mapping between images and labels
             </template>
             <template #content>
-              <FileSelection
-                :accept-files="['.csv']"
-                :is-multiple="false"
-                :info-text="true"
-                @files="setCSV($event)"
-              >
-                <template #text>
-                  The CSV file must contain a header with only two columns (file
-                  name, label). The file name must NOT include the file
-                  extension. You can find an example of how to create a CSV
-                  <a
-                    class="underline text-primary-dark dark:text-primary-light"
-                    href="https://github.com/epfml/disco/blob/develop/docs/examples/dataset_csv_creation.ipynb"
-                    >here</a
-                  >.
-                </template>
+              <FileSelection :accept-files="['.csv']" @files="setCSV($event)">
+                The CSV file must contain a header with only two columns (file
+                name, label). The file name must NOT include the file extension.
+                You can find an example of how to create a CSV
+                <a
+                  class="underline text-primary-dark dark:text-primary-light"
+                  href="https://github.com/epfml/disco/blob/develop/docs/examples/dataset_csv_creation.ipynb"
+                >
+                  here
+                </a>
+                .
               </FileSelection>
             </template>
           </IconCard>
@@ -104,11 +102,9 @@ If the task has few labels then the default is to connect by group, otherwise co
           >
             <template #title> Load the folder containing all images </template>
             <template #content>
-              <FileSelection :info-text="true" @files="setFolder($event)">
-                <template #text>
-                  Select a folder containing all images contained in the
-                  selected CSV file.
-                </template>
+              <FileSelection multiple="folder" @files="setFolder($event)">
+                Select a folder containing all images contained in the selected
+                CSV file.
               </FileSelection>
             </template>
           </IconCard>
@@ -235,7 +231,7 @@ function setFolder(files: Set<File> | undefined): void {
   if (rows === undefined)
     throw new Error("adding folder but no valid CSV loaded");
 
-  labeledFiles.value = files
+  const updatedLabeledFiles = files
     .flatMap((file) => {
       const filename = file.name.split(".").slice(0, -1).join(".");
       const label = rows.get(filename);
@@ -245,12 +241,24 @@ function setFolder(files: Set<File> | undefined): void {
     .reduce(
       (acc, [file, label]) =>
         acc.set(label, acc.get(label, Set<File>()).add(file)),
-      Map(),
+      Map<string, Set<File>>(),
     );
+  labeledFiles.value = updatedLabeledFiles;
 
   if (!fullyFilled.value)
     throw new Error("given folder is missing some files referenced in the CSV");
 
-  emit("dataset", new Dataset(async function* () {}));
+  emit(
+    "dataset",
+    new Dataset(async function* () {
+      for (const [label, files] of updatedLabeledFiles.entries()) {
+        for (const file of files) {
+          const image = await loadImage(file);
+
+          yield { filename: file.name, image, label };
+        }
+      }
+    }),
+  );
 }
 </script>
