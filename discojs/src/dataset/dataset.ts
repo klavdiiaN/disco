@@ -193,7 +193,7 @@ export async function datasetToData(
                 [image.width, image.height, 3],
                 "int32",
               ),
-              ys: tf.oneHot(label, labels.size, 0, 1, "int32") as tf.Tensor1D,
+              ys: tf.oneHot(label, labels.size, 1, 0, "int32") as tf.Tensor1D,
             }) satisfies {
               xs: tf.Tensor3D;
               ys: tf.Tensor1D;
