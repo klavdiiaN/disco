@@ -1,3 +1,5 @@
+import "@tensorflow/tfjs-node"
+
 import {
   Disco, fetchTasks, client as clients,
   aggregator as aggregators, models

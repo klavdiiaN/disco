@@ -1,4 +1,5 @@
 import * as path from 'node:path'
+import '@tensorflow/tfjs-node'
 
 import type { Image, Task, TypedDataset } from '@epfml/discojs'
 import { Disco, fetchTasks, Dataset } from '@epfml/discojs'
