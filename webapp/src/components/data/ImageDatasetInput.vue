@@ -159,15 +159,8 @@ function isCSVRow(raw: unknown): raw is CSVRow {
 }
 
 const csvRows = ref<Map<string, string>>(); // filename -> label
-
 const connectImagesByGroup = ref(props.labels.size <= 2);
-
 const labeledFiles = ref<Map<string, Set<File>>>(Map());
-const fullyFilled = computed(
-  () =>
-    labeledFiles.value.size === props.labels.size &&
-    labeledFiles.value.valueSeq().every((files) => !files.isEmpty()),
-);
 
 const cannotUploadFiles = computed(() => !csvRows.value);
 
@@ -205,19 +198,18 @@ function setLabeledFiles(files: Set<File> | undefined, label: string): void {
   const updatedLabeledFiles = labeledFiles.value.set(label, files);
   labeledFiles.value = updatedLabeledFiles;
 
-  if (fullyFilled.value)
-    emit(
-      "dataset",
-      new Dataset(async function* () {
-        for (const [label, files] of updatedLabeledFiles.entries()) {
-          for (const file of files) {
-            const image = await loadImage(file);
+  emit(
+    "dataset",
+    new Dataset(async function* () {
+      for (const [label, files] of updatedLabeledFiles.entries()) {
+        for (const file of files) {
+          const image = await loadImage(file);
 
-            yield { filename: file.name, image, label };
-          }
+          yield { filename: file.name, image, label };
         }
-      }),
-    );
+      }
+    }),
+  );
 }
 
 function setFolder(files: Set<File> | undefined): void {
@@ -231,12 +223,20 @@ function setFolder(files: Set<File> | undefined): void {
   if (rows === undefined)
     throw new Error("adding folder but no valid CSV loaded");
 
-  const updatedLabeledFiles = files
-    .flatMap((file) => {
+  const filenameToFile = Map(
+    files.map((file) => {
       const filename = file.name.split(".").slice(0, -1).join(".");
-      const label = rows.get(filename);
-      if (label === undefined) return []; // irrelevant file
-      return [[file, label] as const];
+      return [filename, file] as const;
+    }),
+  );
+
+  const updatedLabeledFiles = rows
+    .entrySeq()
+    .map(([filename, label]) => {
+      const file = filenameToFile.get(filename);
+      if (file === undefined)
+        throw new Error(`"${filename}" specified in CSV not found in folder`);
+      return [file, label] as const;
     })
     .reduce(
       (acc, [file, label]) =>
@@ -244,9 +244,6 @@ function setFolder(files: Set<File> | undefined): void {
       Map<string, Set<File>>(),
     );
   labeledFiles.value = updatedLabeledFiles;
-
-  if (!fullyFilled.value)
-    throw new Error("given folder is missing some files referenced in the CSV");
 
   emit(
     "dataset",

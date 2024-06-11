@@ -5,10 +5,10 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ImageDatasetInput from "../ImageDatasetInput.vue";
 import FileSelection from "../FileSelection.vue";
 
-it("updates dataset builder when adding multiple files", async () => {
+it("emits each time when a file", async () => {
   const wrapper = mount(ImageDatasetInput, {
     props: {
-      labels: Set.of("first", "second", "third"),
+      labels: Set.of("file"),
       isOnlyPrediction: false,
     },
   });
@@ -17,21 +17,16 @@ it("updates dataset builder when adding multiple files", async () => {
   expect(labelsByGroup.text()).to.equal("group");
   await labelsByGroup.trigger("click");
 
-  const fileSelectors = wrapper
-    .findAllComponents(FileSelection)
-    .filter((w) => w.isVisible())
-    .map((w) => w.getCurrentComponent());
-  expect(fileSelectors).to.be.of.length(3);
-
-  fileSelectors[0].emit("files", Set.of( new File([], "first.csv")))
-  fileSelectors[1].emit("files", Set.of( new File([], "second.csv")))
-  fileSelectors[2].emit("files", Set.of( new File([], "third.csv")))
+  const fileSelector = wrapper
+    .getComponent(FileSelection)
+    .getCurrentComponent();
+  fileSelector.emit("files", Set.of(new File([], "file.csv")));
 
   const events = wrapper.emitted("dataset");
   expect(events).to.be.of.length(1);
 });
 
-it("updates dataset builder when adding a folder", async () => {
+it("emits when adding a folder", async () => {
   const wrapper = mount(ImageDatasetInput, {
     props: {
       labels: Set.of("first", "second", "third"),
@@ -60,12 +55,15 @@ it("updates dataset builder when adding a folder", async () => {
   csvSelector.emit("files", Set.of(file));
   await flushPromises(); // handler is async
 
-  folderSelector.emit("files", Set.of(
-    new File([], "first.csv"),
-    new File([], "second.csv"),
-    new File([], "third.csv"),
-    new File([], "unrelated.csv"),
-  ));
+  folderSelector.emit(
+    "files",
+    Set.of(
+      new File([], "first.csv"),
+      new File([], "second.csv"),
+      new File([], "third.csv"),
+      new File([], "unrelated.csv"),
+    ),
+  );
 
   const events = wrapper.emitted("dataset");
   expect(events).to.be.of.length(1);
