@@ -1,5 +1,5 @@
 export class Image<
-  D extends 3 | 4 = 3 | 4,
+  D extends 1 | 3 | 4 = 1 | 3 | 4,
   W extends number = number,
   H extends number = number,
 > {

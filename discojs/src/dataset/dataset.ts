@@ -3,6 +3,7 @@ import * as tf from "@tensorflow/tfjs";
 
 import {
   convert_to_number,
+  expand_to_multicolor,
   extract_column as extract_column,
   index_in_list,
   remove_alpha,
@@ -183,7 +184,10 @@ export async function datasetToData(
       const converted = dataset
         .map(
           ([image, label]) =>
-            [remove_alpha(image), index_in_list(label, labels)] as const,
+            [
+              expand_to_multicolor(remove_alpha(image)),
+              index_in_list(label, labels),
+            ] as const,
         )
         .map(
           ([image, label]) =>
