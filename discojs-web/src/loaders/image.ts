@@ -1,6 +1,6 @@
 import { Image as DiscoImage } from "@epfml/discojs";
 
-export async function load(file: File): Promise<DiscoImage<4>> {
+export async function load(file: Blob): Promise<DiscoImage<4>> {
   const image = new Image();
   const url = URL.createObjectURL(file);
   image.src = url;
