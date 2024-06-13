@@ -11,6 +11,10 @@
       :validator="validator"
       @dataset="setTabularDataset($event)"
     />
+    <TextDatasetInput
+      v-else-if="task.trainingInformation.dataType === 'text'"
+      @dataset="setTextDataset($event)"
+    />
   </div>
 </template>
 
@@ -25,6 +29,7 @@ import ImageDatasetInput, {
   type NamedLabeledImageDataset,
 } from "./ImageDatasetInput.vue";
 import TabularDatasetInput from "./TabularDatasetInput.vue";
+import TextDatasetInput from "./TextDatasetInput.vue";
 
 export type TypedNamedDataset =
   | ["image", NamedLabeledImageDataset]
@@ -46,12 +51,16 @@ const validator = computed(() => {
   return (row: Tabular) => Set(Object.keys(row)).isSuperset(columns);
 });
 
+function setImageDataset(value: NamedLabeledImageDataset | undefined) {
+  if (value === undefined) emit("dataset", undefined);
+  else emit("dataset", ["image", value]);
+}
 function setTabularDataset(value: Dataset<Tabular> | undefined) {
   if (value === undefined) emit("dataset", undefined);
   else emit("dataset", ["tabular", value]);
 }
-function setImageDataset(value: NamedLabeledImageDataset | undefined) {
+function setTextDataset(value: Dataset<Text> | undefined) {
   if (value === undefined) emit("dataset", undefined);
-  else emit("dataset", ["image", value]);
+  else emit("dataset", ["text", value]);
 }
 </script>
