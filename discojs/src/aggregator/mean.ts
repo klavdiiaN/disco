@@ -1,4 +1,5 @@
 import type { Map } from "immutable";
+import { List } from 'immutable'
 
 import { AggregationStep, Base as Aggregator } from "./base.js";
 import type { Model, WeightsContainer, client } from "../index.js";
@@ -67,9 +68,26 @@ export class MeanAggregator extends Aggregator<WeightsContainer> {
 
     this.log(AggregationStep.AGGREGATE);
 
-    const result = aggregation.avg(currentContributions.values());
+    //const contrList = List(currentContributions.values())
 
-    if (this.model !== undefined) this.model.weights = result;
+    // important!!!!!!!
+    /*contrList.forEach(a => {
+      console.log('How many weigtjs: ', a.weights)
+    })*/
+
+    /*const arrayBig = [...currentContributions.values()];
+    let listFull = []
+    for (let res = currentContributions.values().next(); !res.done; res = currentContributions.values().next()){
+      const weight = res.value
+      //listFull.push(weight.weights.length)
+    //console.log('Full list: ', listFull.length)
+      console.log('How many weights: ', weight.weights.length)}*/
+    
+    const result = aggregation.avg(currentContributions.values());
+   /* if (this.model !== undefined)   console.log('Weights Model: ', this.model.weights) 
+      console.log('Results: ', result)*/
+
+    if (this.model !== undefined)      this.model.weights = result;
     this.emit(result);
   }
 

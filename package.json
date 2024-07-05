@@ -15,7 +15,10 @@
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "7",
+    "aws-sdk": "^2.1654.0",
     "eslint": "8",
+    "mock-aws-s3": "^4.0.2",
+    "nock": "^13.5.4",
     "typescript": "5",
     "typescript-eslint": "7"
   }

@@ -85,33 +85,66 @@ export class Disco {
    * @param dataTuple The data tuple
    */
   // TODO RoundLogs should contain number of participants but Trainer doesn't need client
-  async *fit(dataTuple: data.DataSplit): AsyncGenerator<RoundLogs & { participants: number }> {
+  async *fit(dataTuple: data.DataSplit, clientNumber: number | undefined=0, dataPush?: data.DataSplit, dataVal?: data.DataSplit): AsyncGenerator<RoundLogs & { participants: number }> {
     this.logger.success("Training started.");
 
     const trainData = dataTuple.train.preprocess().batch();
-    const validationData =
-      dataTuple.validation?.preprocess().batch() ?? trainData;
-    await this.client.connect();
-    const trainer = await this.trainer;
+    let validationData: data.Data;
+    let pushData: data.Data;
+    if (dataVal){
+      validationData =
+      dataVal.train.preprocess().batch()
+    } else { validationData =
+      dataTuple.validation?.preprocess().batch() ?? trainData }
 
-    for await (const roundLogs of trainer.fitModel(trainData.dataset, validationData.dataset)) {
-      let msg = `Round: ${roundLogs.round}\n`
-      for (const epochLogs of roundLogs.epochs.values()) {
-        msg += `    Epoch: ${epochLogs.epoch}\n`
-        msg += `        Training loss: ${epochLogs.training.loss}\n`
-        if (epochLogs.training.accuracy !== undefined) {
-          msg += `        Training accuracy: ${epochLogs.training.accuracy}\n`
+    if (dataPush){
+      pushData = dataPush.train.preprocess().batch();
+      await this.client.connect();
+      const trainer = await this.trainer;
+
+      for await (const roundLogs of trainer.fitModel(trainData.dataset, validationData.dataset, clientNumber, pushData.dataset)) {
+        let msg = `Round: ${roundLogs.round}\n`
+        for (const epochLogs of roundLogs.epochs.values()) {
+          msg += `    Epoch: ${epochLogs.epoch}\n`
+          msg += `        Training loss: ${epochLogs.training.loss}\n`
+          if (epochLogs.training.accuracy !== undefined) {
+            msg += `        Training accuracy: ${epochLogs.training.accuracy}\n`
+          }
+          if (epochLogs.validation !== undefined) {
+            msg += `        Validation loss: ${epochLogs.validation.loss}\n`
+            msg += `        Validation accuracy: ${epochLogs.validation.accuracy}\n`
+          }
         }
-        if (epochLogs.validation !== undefined) {
-          msg += `        Validation loss: ${epochLogs.validation.loss}\n`
-          msg += `        Validation accuracy: ${epochLogs.validation.accuracy}\n`
+        this.logger.success(msg)
+
+        yield {
+          ...roundLogs,
+          participants: this.client.nodes.size + 1 // add ourself
         }
       }
-      this.logger.success(msg)
+    } else {
+      await this.client.connect();
+      const trainer = await this.trainer;
 
-      yield {
-        ...roundLogs,
-        participants: this.client.nodes.size + 1 // add ourself
+      for await (const roundLogs of trainer.fitModel(trainData.dataset, validationData.dataset, clientNumber)) {
+        let msg = `Round: ${roundLogs.round}\n`
+        for (const epochLogs of roundLogs.epochs.values()) {
+          msg += `    Epoch: ${epochLogs.epoch}\n`
+          msg += `        Training loss: ${epochLogs.training.loss}\n`
+          if (epochLogs.training.accuracy !== undefined) {
+            msg += `        Training accuracy: ${epochLogs.training.accuracy}\n`
+          }
+          if (epochLogs.validation !== undefined) {
+            msg += `        Validation loss: ${epochLogs.validation.loss}\n`
+            msg += `        Validation accuracy: ${epochLogs.validation.accuracy}\n`
+          }
+        }
+        this.logger.success(msg)
+
+        yield {
+          ...roundLogs,
+          participants: this.client.nodes.size + 1 // add ourself
+        }
       }
     }
 

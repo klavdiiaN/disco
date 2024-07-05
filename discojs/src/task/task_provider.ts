@@ -1,7 +1,7 @@
 import type { Model, Task } from '../index.js'
 
 export interface TaskProvider {
-  getTask: () => Task
+  getTask: (numClasses?: number) => Task
   // Create the corresponding model ready for training (compiled)
-  getModel: () => Promise<Model>
+  getModel: (numClasses?: number) => Promise<Model>
 }

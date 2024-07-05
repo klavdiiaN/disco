@@ -4,10 +4,12 @@ import type tf from '@tensorflow/tfjs'
 import type { Model } from '../index.js'
 import { models, serialization } from '../index.js'
 import { GPTConfig } from '../models/index.js'
+import { ppnetConfig } from '../models/ppnet/config.js'
 
 const Type = {
   TFJS: 0,
-  GPT: 1
+  GPT: 1,
+  PPNet: 2
 } as const
 
 export type Encoded = Uint8Array
@@ -28,10 +30,16 @@ export async function encode (model: Model): Promise<Encoded> {
     return msgpack.encode([Type.GPT, serializedWeights, config])
   }
 
+  if (model instanceof models.PPNet) {
+    const { weights, config } = model.serialize()
+    const serializedWeights = await serialization.weights.encode(weights)
+    return msgpack.encode([Type.PPNet, serializedWeights, config])
+  }
+
   throw new Error('unknown model type')
 }
 
-export async function decode (encoded: unknown): Promise<Model> {
+export async function decode (encoded: unknown, numClasses?: number): Promise<Model> {
   if (!isEncoded(encoded)) {
     throw new Error("Invalid encoding, raw encoding isn't an instance of Uint8Array")
   }
@@ -72,6 +80,27 @@ export async function decode (encoded: unknown): Promise<Model> {
       const nums = arr as number[]
       const weights = serialization.weights.decode(nums)
       return models.GPT.deserialize({weights, config})
+    }
+    case Type.PPNet: { 
+      let config 
+      if (raw.length == 2) {
+        config = undefined
+      } else if (raw.length == 3) {
+        config = raw[2] as ppnetConfig
+      } else {
+        throw new Error('invalid encoding, PPNet-tfjs model encoding should be an array of length 2 or 3')
+      }
+      console.log(typeof rawModel)
+      if (!Array.isArray(rawModel)) {
+        throw new Error('invalid encoding, PPNet-tfjs model weights should be an array')
+      }
+      const arr: unknown[] = rawModel
+      if (arr.some((r) => typeof r !== 'number')) {
+        throw new Error("invalid encoding, PPNet-tfjs weights should be numbers")
+      }
+      const nums = arr as number[]
+      const weights = serialization.weights.decode(nums)
+      return models.PPNet.deserialize({weights, config}, numClasses)
     }
     default:
       throw new Error('invalid encoding, model type unrecognized')

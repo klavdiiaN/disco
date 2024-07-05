@@ -49,6 +49,8 @@ export abstract class Trainer {
   async *fitModel(
     dataset: tf.data.Dataset<tf.TensorContainer>,
     valDataset: tf.data.Dataset<tf.TensorContainer>,
+    clientNumber?: number,
+    pushDataset?: tf.data.Dataset<tf.TensorContainer>,
   ): AsyncGenerator<RoundLogs> {
     if (this.training !== undefined) {
       throw new Error(
@@ -58,7 +60,7 @@ export abstract class Trainer {
 
     await this.onRoundBegin(0);
 
-    this.training = this.model.train(dataset, valDataset, this.#epochs);
+    this.training = this.model.train(dataset, valDataset, this.#epochs, clientNumber, pushDataset);
 
     for await (const logs of this.training) {
       // for now, round (sharing on network) == epoch (full pass over local data)

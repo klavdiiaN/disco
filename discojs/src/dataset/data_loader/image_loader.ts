@@ -37,7 +37,9 @@ export abstract class ImageLoader<Source> extends DataLoader<Source> {
         ys: config.labels[0]
       }
     }
-    return tf.data.array([tensorContainer])
+    const finalArray = tf.data.array([tensorContainer])
+    tensorContainer.dispose
+    return finalArray
   }
 
   private async buildDataset (images: Source[], labels: number[], indices: number[], config?: DataConfig): Promise<Data> {
@@ -88,7 +90,16 @@ export abstract class ImageLoader<Source> extends DataLoader<Source> {
         return label_int
       })
 
-      labels = await tf.oneHot(tf.tensor1d(labels, 'int32'), numberOfClasses).array() as number[]
+      //labels = await tf.oneHot(tf.tensor1d(labels, 'int32'), numberOfClasses).array() as number[]
+      const labelsTensor = tf.tensor1d(labels, 'int32');
+      try {
+          const oneHotTensor = tf.oneHot(labelsTensor, numberOfClasses); // This creates a new tensor
+          const oneHotLabels = await oneHotTensor.array();  // This converts tensor to array
+          labels = oneHotLabels as number[];                // Safe to cast since you know the structure
+          oneHotTensor.dispose();                          // Dispose of the oneHot tensor
+      } finally {
+          labelsTensor.dispose();                          // Ensure original labels tensor is always disposed
+      } 
     }
     if (config?.shuffle === undefined || config?.shuffle) {
       this.shuffle(indices)

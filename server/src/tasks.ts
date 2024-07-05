@@ -24,22 +24,22 @@ export class TasksAndModels {
     this.listeners.forEach((listener) => { listener(task, model) })
   }
 
-  async loadDefaultTasks (): Promise<void> {
+  async loadDefaultTasks (numClasses?: number): Promise<void> {
     const tasks = Object.values<TaskProvider>(defaultTasks)
     await Promise.all(
-      tasks.map(async (t: TaskProvider) => await this.addTaskAndModel(t))
+      tasks.map(async (t: TaskProvider) => await this.addTaskAndModel(t, numClasses))
     )
   }
 
   // Returns already saved model in priority, then the model from the task definition
-  private async loadModelFromTask(task: Task | TaskProvider): Promise<Model> {
+  private async loadModelFromTask(task: Task | TaskProvider, numClasses?: number): Promise<Model> {
     const discoTask = isTask(task) ? task : task.getTask()
     let model: Model | undefined
     
     const modelPath = `./models/${discoTask.id}/`
     try {
       const content = await fs.readFile(`${modelPath}/model.json`)
-      return await serialization.model.decode(content)
+      return await serialization.model.decode(content, numClasses)
     } catch {
       // unable to read file, continuing
     }
@@ -47,7 +47,7 @@ export class TasksAndModels {
     if (isTask(task)) {
       throw new Error('saved model not found and no way to get it')
     } else {
-      model = await task.getModel()
+      model = await task.getModel(numClasses)
     }
 
     await fs.mkdir(modelPath, { recursive: true })
@@ -109,7 +109,7 @@ export class TasksAndModels {
     }
   }
 
-  async addTaskAndModel (task: Task | TaskProvider, model?: Model | URL): Promise<void> {
+  async addTaskAndModel (task: Task | TaskProvider, numClasses?: number, model?: Model | URL): Promise<void> {
     let discoTask: Task
     if (isTask(task)) {
       discoTask = task
@@ -119,7 +119,7 @@ export class TasksAndModels {
 
     let tfModel: Model
     if (model === undefined) {
-      tfModel = await this.loadModelFromTask(task)
+      tfModel = await this.loadModelFromTask(task, numClasses)
     } else if (model instanceof Model) {
       tfModel = model
     } else if (model instanceof URL) {

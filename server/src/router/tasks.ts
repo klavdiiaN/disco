@@ -15,7 +15,8 @@ export class Tasks {
 
   constructor (
     private readonly config: Config,
-    tasksAndModels: TasksAndModels
+    tasksAndModels: TasksAndModels,
+    numClasses?: number
   ) {
     this.ownRouter = express.Router()
 
@@ -41,9 +42,9 @@ export class Tasks {
         return
       }
 
-      serialization.model.decode(model)
+      serialization.model.decode(model, numClasses)
         .then(async (model) => {
-          await tasksAndModels.addTaskAndModel(newTask, model)
+          await tasksAndModels.addTaskAndModel(newTask, numClasses, model)
         })
         .then(() => res.status(200).end('Successful task upload'))
         .catch(console.error)

@@ -35,10 +35,15 @@ const normalize: PreprocessingFunction = {
   type: ImagePreprocessing.Normalize,
   apply: async (entry: Promise<tf.TensorContainer>): Promise<tf.TensorContainer> => {
     const { xs, ys } = await entry as ImageEntry
-    return {
+    /*return {
       xs: xs.div(tf.scalar(255)),
       ys
-    }
+    }*/
+    return tf.tidy(() => {
+    const normalizedXs = xs.div(tf.scalar(255));
+    //xs.dispose(); // Dispose of the original tensor after normalization
+    return { xs: normalizedXs, ys };
+  });
   }
 }
 

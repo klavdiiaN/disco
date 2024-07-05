@@ -13,12 +13,13 @@ export class Router {
 
   private readonly ownRouter: expressWS.Router
 
-  constructor (
+  constructor(
     wsApplier: expressWS.Instance,
     private readonly tasksAndModels: TasksAndModels,
-    private readonly config: Config
+    private readonly config: Config,
+    numClasses?: number
   ) {
-    const tasks = new Tasks(this.config, this.tasksAndModels)
+    const tasks = new Tasks(this.config, this.tasksAndModels, numClasses)
     const federated = new Federated(wsApplier, this.tasksAndModels)
     const decentralized = new Decentralized(wsApplier, this.tasksAndModels)
 
@@ -44,7 +45,7 @@ export class Router {
     this.ownRouter.use('/tasks', tasks.router)
   }
 
-  get router (): express.Router {
+  get router(): express.Router {
     return this.ownRouter
   }
 }

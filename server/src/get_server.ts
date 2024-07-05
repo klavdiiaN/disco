@@ -23,16 +23,16 @@ export class Disco {
   }
 
   // Load tasks provided by default with disco server
-  async addDefaultTasks (): Promise<void> {
-    await this.tasksAndModels.loadDefaultTasks()
+  async addDefaultTasks (numClasses?: number): Promise<void> {
+    await this.tasksAndModels.loadDefaultTasks(numClasses)
   }
 
   // If a model is not provided, its url must be provided in the task object
-  async addTask (task: Task | TaskProvider, model?: Model | URL): Promise<void> {
-    await this.tasksAndModels.addTaskAndModel(task, model)
+  async addTask (task: Task | TaskProvider, numClasses?: number, model?: Model | URL): Promise<void> {
+    await this.tasksAndModels.addTaskAndModel(task, numClasses, model)
   }
 
-  serve (port?: number): http.Server {
+  serve (port?: number, numClasses?: number): http.Server {
     const wsApplier = expressWS(this.server, undefined, { leaveRouterUntouched: true })
     const app = wsApplier.app
 
@@ -41,7 +41,7 @@ export class Disco {
     app.use(express.json({ limit: '50mb' }))
     app.use(express.urlencoded({ limit: '50mb', extended: false }))
 
-    const baseRouter = new Router(wsApplier, this.tasksAndModels, CONFIG)
+    const baseRouter = new Router(wsApplier, this.tasksAndModels, CONFIG, numClasses)
     app.use('/', baseRouter.router)
 
     const server = app.listen(port ?? CONFIG.serverPort, () => {
@@ -65,8 +65,8 @@ export class Disco {
   }
 }
 
-export async function runDefaultServer (port?: number): Promise<http.Server> {
+export async function runDefaultServer (numClasses?: number, port?: number): Promise<http.Server> {
   const disco = new Disco()
-  await disco.addDefaultTasks()
-  return disco.serve(port)
+  await disco.addDefaultTasks(numClasses)
+  return disco.serve(port, numClasses)
 }

@@ -10,6 +10,10 @@ interface BenchmarkArguments {
   epochs: number
   roundDuration: number
   batchSize: number
+  numClasses: number
+  dataDir: string
+  push: boolean
+  val: boolean
   save: boolean
 }
 
@@ -29,6 +33,10 @@ const unsafeArgs = parse<BenchmarkUnsafeArguments>(
     epochs: { type: Number, alias: 'e', description: 'Number of epochs', defaultValue: 10 },
     roundDuration: { type: Number, alias: 'r', description: 'Round duration', defaultValue: 10 },
     batchSize: { type: Number, alias: 'b', description: 'Training batch size', defaultValue: 10 },
+    numClasses: { type: Number, alias: 'c', description: 'Number of classes', defaultValue: 2 },
+    dataDir: {type: String, alias: 'd', description: 'Path to the data directory'},
+    push: { type: Boolean, alias: 'p', description: 'Data for prototypes push are present', defaultValue: false },
+    val: { type: Boolean, alias: 'v', description: 'Separate validation data are present', defaultValue: false },
     save: { type: Boolean, alias: 's', description: 'Save logs of benchmark', defaultValue: false },
     help: { type: Boolean, optional: true, alias: 'h', description: 'Prints this usage guide' }
   },
@@ -43,6 +51,7 @@ supportedTasks = supportedTasks.set(defaultTasks.simpleFace.getTask().id, defaul
 supportedTasks = supportedTasks.set(defaultTasks.titanic.getTask().id, defaultTasks.titanic.getTask())
 supportedTasks = supportedTasks.set(defaultTasks.cifar10.getTask().id, defaultTasks.cifar10.getTask())
 supportedTasks = supportedTasks.set(defaultTasks.lusCovid.getTask().id, defaultTasks.lusCovid.getTask())
+supportedTasks = supportedTasks.set(defaultTasks.ppnet.getTask(unsafeArgs.numClasses).id, defaultTasks.ppnet.getTask(unsafeArgs.numClasses))
 
 const task = supportedTasks.get(unsafeArgs.task)
 if (task === undefined) {

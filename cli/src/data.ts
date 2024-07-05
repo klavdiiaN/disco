@@ -58,6 +58,74 @@ async function titanicData (titanic: Task): Promise<data.DataSplit> {
   return data
 }
 
+// dir should contain separate folders for train, push (optional) and validation (optional) data 
+
+async function ppnetData (task: Task, dir: string): Promise<data.DataSplit> {
+  dir = dir + '/train/';
+  const labels = await fs.readdir(dir);
+  if (task.trainingInformation !== undefined) {
+    task.trainingInformation.LABEL_LIST = labels;
+    task.trainingInformation.numClasses = labels.length} // update the number of classes parameter based on the dataset structure
+  
+  let allFiles: string[] = []
+  let allLabels: string[] = []
+
+  for (const label of labels){
+    const dirImage = path.join(dir, label)
+    const fileImage = (await fs.readdir(dirImage)).map(file => path.join(dirImage, file))
+    allFiles = allFiles.concat(fileImage)
+    const imageLabels = fileImage.map(_ => `${label}`)
+    allLabels = allLabels.concat(imageLabels)
+  }
+
+  const trainingData = await new NodeImageLoader(task).loadAll(allFiles, {labels: allLabels, validationSplit: 0.1, channels: 3, shuffle: true})
+  return trainingData
+}
+
+async function ppnetDataPush (task: Task, dir: string): Promise<data.DataSplit> {
+  dir = dir + '/push/';
+  const labels = await fs.readdir(dir);
+  if (task.trainingInformation !== undefined) {
+    task.trainingInformation.LABEL_LIST = labels;
+    task.trainingInformation.numClasses = labels.length}
+  
+  let allFiles: string[] = []
+  let allLabels: string[] = []
+
+  for (const label of labels){
+    const dirImage = path.join(dir, label)
+    const fileImage = (await fs.readdir(dirImage)).map(file => path.join(dirImage, file))
+    allFiles = allFiles.concat(fileImage)
+    const imageLabels = fileImage.map(_ => `${label}`)
+    allLabels = allLabels.concat(imageLabels)
+  }
+
+  const pushData = await new NodeImageLoader(task).loadAll(allFiles, {labels: allLabels, validationSplit: 0, channels: 3, shuffle: true}) //, { labels: trainingLabels })
+  return pushData
+}
+
+async function ppnetDataVal (task: Task, dir: string): Promise<data.DataSplit> {
+  dir = dir + '/validation/';
+  const labels = await fs.readdir(dir);
+  if (task.trainingInformation !== undefined) {
+    task.trainingInformation.LABEL_LIST = labels;
+    task.trainingInformation.numClasses = labels.length}
+  
+  let allFiles: string[] = []
+  let allLabels: string[] = []
+
+  for (const label of labels){
+    const dirImage = path.join(dir, label)
+    const fileImage = (await fs.readdir(dirImage)).map(file => path.join(dirImage, file))
+    allFiles = allFiles.concat(fileImage)
+    const imageLabels = fileImage.map(_ => `${label}`)
+    allLabels = allLabels.concat(imageLabels)
+  }
+
+  const pushData = await new NodeImageLoader(task).loadAll(allFiles, {labels: allLabels, validationSplit: 0, channels: 3, shuffle: true}) //, { labels: trainingLabels })
+  return pushData
+}
+
 export async function getTaskData (task: Task): Promise<data.DataSplit> {
   switch (task.id) {
     case 'simple_face':
@@ -73,4 +141,16 @@ export async function getTaskData (task: Task): Promise<data.DataSplit> {
     default:
       throw new Error(`Data loader for ${task.id} not implemented.`)
   }
+}
+
+export async function getPpnetData (task: Task, dir: string): Promise<data.DataSplit> {
+  return await ppnetData(task, dir)
+}
+
+export async function getPpnetDataPush (task: Task, dir: string): Promise<data.DataSplit> {
+  return await ppnetDataPush(task, dir)
+}
+
+export async function getPpnetDataVal (task: Task, dir: string): Promise<data.DataSplit> {
+  return await ppnetDataVal(task, dir)
 }

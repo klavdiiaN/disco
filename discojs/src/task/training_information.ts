@@ -29,6 +29,8 @@ export interface TrainingInformation {
   // LABEL_LIST of classes, e.g. if two class of images, one with dogs and one with cats, then we would
   // define ['dogs', 'cats'].
   LABEL_LIST?: string[]
+  // number of classes for classification tasks
+  numClasses?: number
   // scheme: Distributed training scheme, i.e. Federated and Decentralized
   scheme: 'decentralized' | 'federated' | 'local'
   // noiseScale: Differential Privacy (DP): Affects the variance of the Gaussian noise added to the models / model updates.
@@ -97,6 +99,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     validationSplit,
     tokenizer,
     maxSequenceLength,
+    numClasses,
     tensorBackend
   }: Partial<Record<keyof TrainingInformation, unknown>> = raw
 
@@ -107,6 +110,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     typeof batchSize !== 'number' ||
     typeof roundDuration !== 'number' ||
     typeof validationSplit !== 'number' ||
+    typeof numClasses !== 'number' ||
     (tokenizer !== undefined && typeof tokenizer !== 'string' && !(tokenizer instanceof PreTrainedTokenizer)) ||
     (maxSequenceLength !== undefined && typeof maxSequenceLength !== 'number') ||
     (aggregator !== undefined && typeof aggregator !== 'number') ||
@@ -181,6 +185,7 @@ export function isTrainingInformation (raw: unknown): raw is TrainingInformation
     validationSplit,
     tokenizer,
     maxSequenceLength,
+    numClasses,
     tensorBackend
   }
   const _correct: TrainingInformation = repack

@@ -46,6 +46,8 @@ export abstract class Model implements Disposable{
     trainingData: Dataset,
     validationData?: Dataset,
     epochs?: number,
+    clientNumber?: number,
+    pushData?: Dataset
   ): AsyncGenerator<EpochLogs, void>;
 
   /** Predict likely values */
