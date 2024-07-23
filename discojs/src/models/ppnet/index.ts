@@ -1,121 +1,68 @@
-/**
- * this code is taken from gpt-tfjs with modifications from @peacefulotter and @lukemovement
- **/
+// This code is adapted from the GPT model implementation in DISCO //
 
 import * as tf from '@tensorflow/tfjs';
 import { Model } from '../model.js';
 import { PPNetModel } from './model.js';
-import { WeightsContainer, training } from '../../index.js';
+import { WeightsContainer} from '../../index.js';
 import type { Dataset } from '../../dataset/index.js';
 import type { EpochLogs, Prediction, Sample } from '../model.js';
 import type { ppnetConfig } from './config.js'; 
 
-interface Config {
-    lr: number
-    imgSize: number
-    prototypeShape: number[]
-    //prototypeActivationFunction: string
-    featureShape: number[]
-    pretrainedPath: string
-    numClasses: number
-    batchSizeTrain: number
-    batchSizeEval: number
-    batchSizePush: number
-};
+export class PPNet extends Model {
+    private model!: PPNetModel;
 
-/*export class PPNet extends Model {
-    private model: PPNetModel
+    private constructor() {
+        super();
+    }
 
-    constructor (){
-        super ()
-
-        const config: Config = {
+    static async createInstance(numClasses: number | undefined=2): Promise<PPNet> {
+        const ppNet = new PPNet();
+        const numProts = 10*numClasses;
+        const config: ppnetConfig = {
             lr: 0.001,
             imgSize: 224,
-            prototypeShape: [20, 1, 1, 128],
-            //prototypeActivationFunction: 'log',
-            featureShape:[7, 7, 2048],
+            prototypeShape: [numProts, 1, 1, 128],
+            featureShape: [7, 7, 2048], // shape of the final convolutional output of the MobileNetV2 model
             pretrainedPath: 'https://storage.googleapis.com/deai-313515.appspot.com/models/mobileNetV2_35_alpha_2_classes/model.json',
-            numClasses: 2,
+            //pretrainedPath: 'file://../model_cardio/model.json',
+            numClasses: numClasses,
             batchSizeTrain: 80,
             batchSizeEval: 127,
-            batchSizePush: 75
-        }
+            batchSizePush: 75,
+            validationSplit: 0.1
+        };
 
-        //this.model = new PPNetModel(config);
-        PPNetModel.createInstance(config).then(this.model => {
-          console.log(this.model.summary())
-        })
-    };*/
+        await PPNetModel.createInstance(config).then(model => {
+          ppNet.model = model;
+        });
 
-    export class PPNet extends Model {
-      //private static numClassesDefault: number = 2; 
-      private model!: PPNetModel;
-  
-      private constructor() {
-          super();
-      }
-  
-      static async createInstance(numClasses: number | undefined=2): Promise<PPNet> {
-          //PPNet.numClassesDefault = numClasses;
-          //console.log('Num classes:', numClasses)
-          const ppNet = new PPNet();
-          const numProts = 10*numClasses;
-          const config: ppnetConfig = {
-              lr: 0.001,
-              imgSize: 224,
-              prototypeShape: [numProts, 1, 1, 128],
-              featureShape: [7, 7, 2048],
-              pretrainedPath: 'https://storage.googleapis.com/deai-313515.appspot.com/models/mobileNetV2_35_alpha_2_classes/model.json',
-              //pretrainedPath: 'file://../model_cardio/model.json',
-              numClasses: numClasses,
-              batchSizeTrain: 80,
-              batchSizeEval: 127,
-              batchSizePush: 75,
-              validationSplit: 0.1
-          };
-  
-          await PPNetModel.createInstance(config).then(model => {
-            ppNet.model = model;
-            //console.log(ppNet.model.summary());
-          });
-  
-          return ppNet;
-      }
+        return ppNet;
+    }
 
-    /*static setNumClasses(numClasses: number): void {
-        PPNet.numClassesDefault = numClasses; // Method to set default numClasses externally
-    }*/
+  /*static setNumClasses(numClasses: number): void {
+      PPNet.numClassesDefault = numClasses; // Method to set default numClasses externally
+  }*/
 
-    get config (): Required<ppnetConfig> {
-      return this.model.getPPNetConfig
-    };
+  get config (): Required<ppnetConfig> {
+    return this.model.getPPNetConfig
+  };
 
-    /*override get weights (): WeightsContainer {
-      return new WeightsContainer(this.model.weights.map((w) => w.read()))
-    };
-  
-    override set weights (ws: WeightsContainer) {
-      this.model.setWeights(ws.weights)
-    };*/
+  override get weights(): WeightsContainer {
+    if (!this.model) {
+        console.error("Model is not initialized yet.");
+        return new WeightsContainer([]); // or handle this scenario appropriately
+    }
+    return new WeightsContainer(this.model.weights.map((w) => w.read()));
+}
 
-    override get weights(): WeightsContainer {
+  override set weights(ws: WeightsContainer) {
       if (!this.model) {
           console.error("Model is not initialized yet.");
-          return new WeightsContainer([]); // or handle this scenario appropriately
+          return; // or schedule the setting for when the model is ready
       }
-      return new WeightsContainer(this.model.weights.map((w) => w.read()));
+      this.model.setWeights(ws.weights);
   }
   
-    override set weights(ws: WeightsContainer) {
-        if (!this.model) {
-            console.error("Model is not initialized yet.");
-            return; // or schedule the setting for when the model is ready
-        }
-        this.model.setWeights(ws.weights);
-    }
-  
-
     static async deserialize(data: PPNetSerialization, numClasses?: number): Promise<PPNet> {
       const ppNet = await PPNet.createInstance(numClasses);
       ppNet.weights = data.weights;
@@ -130,13 +77,14 @@ interface Config {
   }
 
     /**
-   * The PPNet train methods wraps the model.fitDataset call in a for loop to act as a generator (of logs)
+   * The PPNet train method wraps the model.fitDataset call in a for loop to act as a generator (of logs)
    * This allows for getting logs and stopping training without callbacks.
    *
    * @param trainingData training dataset
-   * @param validationData validation dataset
+   * @param validationData validation dataset (optional)
    * @param epochs the number of passes of the training dataset
-   * @param tracker
+   * @param clientNumber the number of the currently active client
+   * @param pushData dataset to project prototypes (optiobal)
    */
   override async *train(
     trainingData: Dataset,
