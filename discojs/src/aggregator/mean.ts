@@ -63,31 +63,33 @@ export class MeanAggregator extends Aggregator<WeightsContainer> {
 
   override aggregate(): void {
     const currentContributions = this.contributions.get(0);
+    //console.log('Current contributions:', currentContributions)
     if (currentContributions === undefined)
       throw new Error("aggregating without any contribution");
 
     this.log(AggregationStep.AGGREGATE);
 
-    //const contrList = List(currentContributions.values())
+    /*const contrList = List(currentContributions.values())
 
     // important!!!!!!!
-    /*contrList.forEach(a => {
-      console.log('How many weigtjs: ', a.weights)
+    contrList.forEach(a => {
+      console.log('How many weigths: ', a.weights)
     })*/
-
-    /*const arrayBig = [...currentContributions.values()];
-    let listFull = []
-    for (let res = currentContributions.values().next(); !res.done; res = currentContributions.values().next()){
-      const weight = res.value
-      //listFull.push(weight.weights.length)
-    //console.log('Full list: ', listFull.length)
-      console.log('How many weights: ', weight.weights.length)}*/
     
     const result = aggregation.avg(currentContributions.values());
-   /* if (this.model !== undefined)   console.log('Weights Model: ', this.model.weights) 
-      console.log('Results: ', result)*/
+    
+    /*const resultsList = result.weights;
+    resultsList.forEach(a => {
+      console.log('How many results: ', a.shape)
+    })*/
 
-    if (this.model !== undefined)      this.model.weights = result;
+    const modelWeights = this.model?.weights.weights;
+    if (modelWeights != undefined){modelWeights.forEach(a => {
+      console.log('Model weights: ', a.shape)
+    })}
+    
+    if (this.model !== undefined)      
+      this.model.weights = result;
     this.emit(result);
   }
 
