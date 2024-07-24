@@ -1,17 +1,7 @@
 import * as tf from '@tensorflow/tfjs';
-import * as fs from 'fs';
-import type { ppnetConfig } from './config.js';
-import { DEFAULT_CONFIG } from './config.js';
 
-function resolveConfig (config: ppnetConfig): Required<ppnetConfig> {
-    return {
-      ...DEFAULT_CONFIG,
-      ...config
-    }
-  };
-
+// This function retrieves the class index to which a prototype belongs
 export function getProtoClassIdx (cfg: any): tf.Tensor {
-    //const config = resolveConfig(cfg);
     const config = Object.assign({}, cfg);
     const numClasses = config.numClasses;
     const numPrototypes = config.prototypeShape[0];
@@ -27,23 +17,20 @@ export function getProtoClassIdx (cfg: any): tf.Tensor {
     return protoClassIdBuffer.toTensor();
 };
 
+// This function implements a custom loss function for ProtoPNet which consists of three terms: cross entropy, cluster, and separation cost
 export function protoPartLoss (cfg: any, protoClassId: tf.Tensor) {
     return (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Tensor => {
         return tf.tidy(() => {
-        const predictions = yPred.slice([0, 0], [-1, cfg.numClasses]);
+        const predictions = yPred.slice([0, 0], [-1, cfg.numClasses]); // since output tensor is a combination of two, we first retrieve only the class logits
         //console.log('Predictions:', predictions.shape);
-        const minDistances = yPred.slice([0, cfg.numClasses], [-1, cfg.prototypeShape[0]]);
-        //console.log('Min distances:', minDistances);
-        //const yTrueInt32 = tf.cast(yTrue, 'int32');
-        //const oneHotLabels = tf.oneHot(yTrueInt32, cfg.numClasses);
-        //console.log('Labels:', yTrue.shape);
+        const minDistances = yPred.slice([0, cfg.numClasses], [-1, cfg.prototypeShape[0]]); // retrieve the min distances too
         //console.log('OneHot Labels:', oneHotLabels.shape);
         const crossEntropy = tf.losses.softmaxCrossEntropy(yTrue, predictions);
         //console.log('CrossEntropy:', crossEntropy);
         const labels = yTrue.argMax(1);
         //console.log('Labels:', labels);
 
-        // cluster cost
+        // cluster cost ensures that each training image has at least one patch which is close to a prototype of its own class 
         const maxDistance = cfg.prototypeShape[1] * cfg.prototypeShape[2] * cfg.prototypeShape[3];
         const prototypesOfCorrectClass = tf.transpose(protoClassId.gather(labels, 1));
 
@@ -55,7 +42,7 @@ export function protoPartLoss (cfg: any, protoClassId: tf.Tensor) {
         const clusterCost = tf.mean(tf.sub(maxDistance, invertedDistances)); 
         //console.log('Cluster Cost:', clusterCost);
 
-        // separation cost
+        // separation cost forces every latent patch of a training image to stay away from the prototypes not of its own class
         const prototypesOfWrongClass = tf.sub(tf.scalar(1), prototypesOfCorrectClass);
         const invertedDistancesNontarget = tf.max(
             tf.mul(tf.sub(maxDistance, minDistances), prototypesOfWrongClass),
@@ -67,7 +54,7 @@ export function protoPartLoss (cfg: any, protoClassId: tf.Tensor) {
         const finalLoss = tf.addN([crossEntropy,
             tf.mul(tf.scalar(0.8), clusterCost),
             tf.mul(tf.scalar(-0.08), separationCost)
-        ]);
+        ]); // combine all terms into the final loss function (coefficients are taken from the original ProtoPNet paper)
 
         labels.dispose(); // Dispose tensors that are not needed after their use
             prototypesOfCorrectClass.dispose();
@@ -79,15 +66,4 @@ export function protoPartLoss (cfg: any, protoClassId: tf.Tensor) {
         });
     }
 };
-
-export function readJsonFile(filePath: string) {
-    try {
-        const rawData = fs.readFileSync(filePath, 'utf8');
-        const data = JSON.parse(rawData);
-        return data;
-    } catch (error) {
-        console.error("Error reading or parsing the JSON file:", error);
-        return null;
-    }
-}
 

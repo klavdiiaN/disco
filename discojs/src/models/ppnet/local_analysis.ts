@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import sharp from 'sharp';
 import Jimp from 'jimp';
 import * as path from 'path';
-import { readJsonFile } from './utils.js';
 import { promisify } from 'util';
 import { findHighActivationCrop, applyJetColorMap } from './pushPrototype.js';
 import { parse } from 'ts-command-line-args'

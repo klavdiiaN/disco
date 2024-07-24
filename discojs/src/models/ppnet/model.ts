@@ -1,90 +1,31 @@
+// This script implements layers of the Prototypical Part learning network (ProtoPNet) in DISCO //
+
+// original ProtoPNet GitHub repo: https://github.com/cfchen-duke/ProtoPNet
+// ProtoPNet in federated learning setting: https://github.com/EPFLiGHT/MyTH
+
 import * as tf from '@tensorflow/tfjs';
 import type { ppnetConfig } from './config.js';
 import { DEFAULT_CONFIG } from './config.js';
-import { train } from './train.js'; // implement
-import { Kwargs } from '@tensorflow/tfjs-layers/dist/types.js'; // find
+import { train } from './train.js';
+import { Kwargs } from '@tensorflow/tfjs-layers/dist/types.js';
 import type { TrainingCallbacks } from './types.js';
-//import type { Dataset } from '../dataset/index.js'
 
 
 // SEPARATE FUNCTIONS //
+// This function loads pretrained convolutional layers to learn features. We use MobileNetV2 model pretrained on ImageNet
 async function mobileNetv2 (
     pretrainedPath: string
 ): Promise<tf.LayersModel> {
-    //const handler = tf.io.fileSystem(pretrainedPath);
     const mobileNetv2 = await tf.loadLayersModel(pretrainedPath);
     //console.log(mobileNetv2.summary());
-    const outputLayer = mobileNetv2.getLayer('out_relu').output;
-    //const outputLayer = mobileNetv2.output;
-    //console.log('Output kayer: ', outputLayer)
+    const outputLayer = mobileNetv2.getLayer('out_relu').output; // we don't need the final layers, only convolutional ones
     const featureExtractor = tf.model({name: 'features', inputs: mobileNetv2.inputs, outputs: outputLayer});
 
     return featureExtractor;
 };
 
-/*async function convFeatures (cfg: ppnetConfig): Promise<tf.LayersModel> {
-    const config = Object.assign(
-        {
-            name: 'features',
-        }, 
-        cfg
-    );
-    const inputs = tf.input({ shape: [config.imgSize, config.imgSize, 3] });
-    //console.log('Input shape:', inputs.shape);
-    let x: tf.Tensor | tf.SymbolicTensor | tf.Tensor[] | tf.SymbolicTensor[];
-
-    x = (await mobileNetv2(config.pretrainedPath)).apply(inputs) as tf.SymbolicTensor;
-    //console.log('Output shape:', x.shape)
-   
-    return tf.model({ name: config.name, inputs: inputs, outputs: x });
-};*/
-
-/*async function addOnLayers (features: tf.LayersModel, cfg: ppnetConfig): Promise<tf.LayersModel>{
-    const config = Object.assign(
-        {
-            name: 'addOnLayers',
-        }, 
-        cfg
-    ); 
-
-    const inputs = features.output;
-    //let x = inputs
-    let x: tf.Tensor | tf.SymbolicTensor | tf.Tensor[] | tf.SymbolicTensor[];
-    //x = cnnFeatures;
-    x = inputs;
-
-    x = tf.layers.conv2d({
-        name: 'add_on_layer/conv2_1',
-        filters: config.prototypeShape[3],
-        kernelSize: 1,
-        kernelInitializer: 'glorotUniform',
-        activation: 'relu'
-    }).apply(x);
-    
-    x = tf.layers.conv2d({
-        name: 'add_on_layer/conv2d_2',
-        filters: config.prototypeShape[3],
-        kernelSize: 1,
-        kernelInitializer: 'glorotUniform',
-        activation: 'sigmoid'
-    }).apply(x) as tf.SymbolicTensor;
-
-    return tf.model({ name: config.name, inputs: features.inputs, outputs: x });
-};*/
-
-/*async function convLayers(cfg: ppnetConfig) {
-    const featuresModel = await convFeatures(cfg);
-    featuresModel.trainable = false;
-    console.log(featuresModel.summary());
-    const convLayers = await addOnLayers(featuresModel, cfg);
-    return convLayers;
-}*/
-
+// This function adds two convolutional layers on top of the pretrained ones to decrease depth of the image embeddings
 async function convLayers(cfg: ppnetConfig, inputs: tf.SymbolicTensor) {
-    //const baseModel = await mobileNetv2(cfg.pretrainedPath);
-    //const inputs = tf.input({shape: [cfg.imgSize, cfg.imgSize, 3]});
-    //let x = baseModel.apply(inputs, {name: 'features'}) as tf.SymbolicTensor;
-
     // Add additional convolutional layers with explicit names
     let x = tf.layers.conv2d({
         filters: cfg.prototypeShape[3],
@@ -101,21 +42,17 @@ async function convLayers(cfg: ppnetConfig, inputs: tf.SymbolicTensor) {
         activation: 'sigmoid',
         name: 'additional_conv_2'
     }).apply(x) as tf.SymbolicTensor;
-
-    //const finalModel = tf.model({inputs: inputs, outputs: x, name: 'featureLayers'});
-
-    // Create and return the complete model
     return x
-    //{ model: finalModel, features: baseModel }
 };
 
 // LAYERS //
+// This class implements the prototypical layer which computes distances between the prototypes and the patches of the final image embedding 
 class L2Convolution_ extends tf.layers.Layer {
     private config: Object;
     private prototypeShape: number[];
     private featureShape: number[];
 
-    private prototypeVectors!: tf.LayerVariable;
+    private prototypeVectors!: tf.LayerVariable; // prototypes are learnable network's parameters
     private ones!: tf.LayerVariable;
 
     constructor(config: any) {
@@ -145,7 +82,6 @@ class L2Convolution_ extends tf.layers.Layer {
         return this.prototypeVectors.read()
     };
 
-    // implement //
     set protVectors(update: tf.Tensor){
         this.prototypeVectors.write(update);
     };
@@ -158,6 +94,7 @@ class L2Convolution_ extends tf.layers.Layer {
         this.prototypeVectors.trainable = true
     };
 
+    // perform distance computation
     call(inputs: tf.Tensor<tf.Rank> | tf.Tensor<tf.Rank>[], kwargs: Kwargs): tf.Tensor<tf.Rank> | tf.Tensor<tf.Rank>[] {
         return tf.tidy(() => {
             if (Array.isArray(inputs)) {
@@ -200,6 +137,7 @@ class L2Convolution_ extends tf.layers.Layer {
 tf.serialization.registerClass(L2Convolution_);
 const L2Convolution = (config: any) => new L2Convolution_(config);
 
+// This class implements the pooling operation to take only that patch which is the closets to a prototype
 class MinDistancesPooling_ extends tf.layers.Layer {
     private config: Object;
     private kernelSize: [number, number];
@@ -251,6 +189,7 @@ class MinDistancesPooling_ extends tf.layers.Layer {
 tf.serialization.registerClass(MinDistancesPooling_);
 const MinDistancesPooling = (config: any) => new MinDistancesPooling_(config);
 
+// This class converts distances between patches and prototypes to similarity scores
 class Distance2Similarity_ extends tf.layers.Layer {
     private config: Object;
     private epsilon: number;
@@ -261,7 +200,6 @@ class Distance2Similarity_ extends tf.layers.Layer {
 
         this.config = Object.assign({ name: 'distance_to_similarity' }, config); 
         this.name = 'distance_to_similarity';
-        //this.prototypeActivationFunction = config.prototypeActivationFunction;
         this.epsilon = 1e-4;
     }
 
@@ -291,6 +229,15 @@ class Distance2Similarity_ extends tf.layers.Layer {
 tf.serialization.registerClass(Distance2Similarity_);
 const Distance2Similarity = (config: any) => new Distance2Similarity_(config);
 
+/**
+   * This function puts all the layers together
+   *
+   * @param conf - model config
+   * @returns model - final ProtoPNet which takes images as inputs and returns:
+   *  - combinedOutput (logits and minimal distances between image patches and prototypes as one tensor)
+   *  - distances (all the distances between image patches and prototypes, this is necessary for the push operation)
+   *  - convFeatures (final image embedding, also necessary for the push operation)
+   */
 async function PPNet (conf: ppnetConfig): Promise<tf.LayersModel> {
     const configDefaults = {
         name: 'prototypical_part_network',
@@ -298,37 +245,33 @@ async function PPNet (conf: ppnetConfig): Promise<tf.LayersModel> {
       }
 
     const config = Object.assign({}, configDefaults, conf);
-    const inputs = tf.input({ shape: [config.imgSize, config.imgSize, 3] });
-    const baseModel = await mobileNetv2(conf.pretrainedPath);
+    const inputs = tf.input({ shape: [config.imgSize, config.imgSize, 3] }); // input layer
+    const baseModel = await mobileNetv2(conf.pretrainedPath); // pretrained feature extractor
     const x = baseModel.apply(inputs) as tf.SymbolicTensor;
 
-    const convFeatures = await convLayers(conf, x);
-    //console.log(convFeatures.summary());
-    //const baseModel = convFeatures.features;
-    //const convOutput = convFeatures.apply(inputs);
-    //console.log('Additional conv layers output shape:', convOutput.shape);
-    const distances = L2Convolution(conf).apply(convFeatures) as tf.SymbolicTensor;
+    const convFeatures = await convLayers(conf, x); // additional convolutional layers
+    const distances = L2Convolution(conf).apply(convFeatures) as tf.SymbolicTensor; // distances between prototypes and image patches in the latent space
     //console.log('Distances shape:', distances.shape);
 
-    const minDistances = MinDistancesPooling(conf).apply(distances) as tf.SymbolicTensor;
+    const minDistances = MinDistancesPooling(conf).apply(distances) as tf.SymbolicTensor; // keep the closest patch
     //console.log('Min distances shape:', minDistances.shape);
 
-    const prototype_activations = Distance2Similarity(conf).apply(minDistances);
+    const prototype_activations = Distance2Similarity(conf).apply(minDistances); // convert distances to similarity scires
     //console.log('Prototypes activations:', prototype_activations)
 
     const logits = tf.layers.dense({
         name: 'logits',
         units: config.numClasses
-    }).apply(prototype_activations) as tf.SymbolicTensor;
+    }).apply(prototype_activations) as tf.SymbolicTensor; // final fully-connected layer
 
-    const combinedOutput = tf.layers.concatenate({axis: -1}).apply([logits, minDistances]) as tf.SymbolicTensor;
+    const combinedOutput = tf.layers.concatenate({axis: -1}).apply([logits, minDistances]) as tf.SymbolicTensor; 
     //console.log('Output:', combinedOutput.shape);
     const model = tf.model({ name: 'PPNet_final', inputs: inputs, outputs: [combinedOutput, distances, convFeatures]});
     //console.log(model.summary())
     return model;
 };
 
-// ask about this //
+// taken from GPT implementation in DISCO //
 /**
  * tfjs does not export LazyIterator and Dataset...
  */
@@ -341,45 +284,25 @@ declare abstract class Dataset<T> {
     size: number
 };
 
-// implement
-/*class PPNetModel extends tf.LayersModel {
-    protected peakMemory: { value: number}
-    constructor(protected readonly config: ppnetConfig) {
-        let ppnet: tf.LayersModel;
-    
-        super({ inputs: [], outputs: [] }); // Call super() first
-        this.peakMemory = {value: 0};
-        PPNet(config)
-            .then(output => {
-                ppnet = output;
-                const { inputs, outputs } = ppnet;
-                this.inputs = inputs;
-                this.outputs = outputs;
-                this.peakMemory.value = 0;
-                Object.assign(this, ppnet); // Assign properties after super() call
-            })
-            .catch(error => {
-                console.log(error);
-            });
-    };*/
-    class PPNetModel extends tf.LayersModel {
-        protected peakMemory: { value: number };
-    
-        private constructor(model: tf.LayersModel, protected readonly config: ppnetConfig) {
-            super({ inputs: model.inputs, outputs: model.outputs });
-            this.peakMemory = { value: 0 };
-            Object.assign(this, model);
+// This is to implement ProtoPNet as tf.LayersModel with a fitDataset() method
+class PPNetModel extends tf.LayersModel {
+    protected peakMemory: { value: number };
+
+    private constructor(model: tf.LayersModel, protected readonly config: ppnetConfig) {
+        super({ inputs: model.inputs, outputs: model.outputs });
+        this.peakMemory = { value: 0 };
+        Object.assign(this, model);
+    }
+
+    static async createInstance(config: ppnetConfig): Promise<PPNetModel> {
+        try {
+            const ppnet = await PPNet(config);
+            return new PPNetModel(ppnet, config);
+        } catch (error) {
+            console.error(error);
+            throw new Error("Failed to initialize PPNetModel");
         }
-    
-        static async createInstance(config: ppnetConfig): Promise<PPNetModel> {
-            try {
-                const ppnet = await PPNet(config);
-                return new PPNetModel(ppnet, config);
-            } catch (error) {
-                console.error(error);
-                throw new Error("Failed to initialize PPNetModel");
-            }
-        };
+    };
     
     get getPPNetConfig() {
         return this.config
@@ -390,6 +313,14 @@ declare abstract class Dataset<T> {
         // Adjust model parameters based on the number of classes
     }
 
+    /**
+   * A method to implement training function, adapted from GPT implementation in DISCO
+   *
+   * @param dataset - training dataset
+   * @param args - training arguments
+   * @param clientNumber - index number of the currently training client (necessary to save the model and prototypes to a corresponding folder)
+   * @param pushDataset - dataset to perform push operation (optional)
+   */
     async fitDataset<T> (
       dataset: Dataset<T>,
       args: tf.ModelFitDatasetArgs<T>,
