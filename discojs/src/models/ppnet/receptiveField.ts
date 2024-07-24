@@ -1,3 +1,6 @@
+// This script implements a set of functions to compute the receptive field of latent training patches to perform the prototype push operation //
+// Adapted from https://github.com/cfchen-duke/ProtoPNet
+
 function computeLayerRfInfo(
     layerFilterSize: number,
     layerStride: number,
@@ -6,8 +9,6 @@ function computeLayerRfInfo(
 ): [number, number, number, number] {
     const [nIn, jIn, rIn, startIn] = previousLayerRfInfo;
     const epsilon = 1e-7;
-    //console.log('Filter size:', layerFilterSize);
-    //console.log('Padding:', layerPadding);
 
     let nOut, pad;
     if (layerPadding === 'same') {
