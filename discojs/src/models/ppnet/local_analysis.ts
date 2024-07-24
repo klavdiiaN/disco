@@ -6,23 +6,50 @@ import * as path from 'path';
 import { readJsonFile } from './utils.js';
 import { promisify } from 'util';
 import { findHighActivationCrop, applyJetColorMap } from './pushPrototype.js';
+import { parse } from 'ts-command-line-args'
+
+// specify arguments to parse when running this script //
+interface analysisArguments {
+    testImgName: string
+    testImgLabel: number
+    clientNumber: number
+    epochNumber: number
+    numClasses: number
+  }
+  
+  type BenchmarkAnalysisArguments = {
+    [K in keyof analysisArguments as Exclude<K, 'task'>]: analysisArguments[K]
+  } & {
+    help?: boolean
+  }
+
+const args = parse<BenchmarkAnalysisArguments>(
+    {
+      testImgName: { type: String, alias: 'i', description: 'Name of an image to analyse'},
+      testImgLabel: { type: Number, alias: 'l', description: 'Label of the test image'},
+      clientNumber: { type: Number, alias: 'n', description: 'Index number of the client which model will be used for analysis, for local models use the default value', defaultValue: 0 },
+      epochNumber: { type: Number, alias: 'e', description: 'Number of epochs used for training', defaultValue: 10 },
+      numClasses: { type: Number, alias: 'c', description: 'Number of classes in the dataset', defaultValue: 2 },
+      help: { type: Boolean, optional: true, alias: 'h', description: 'Prints this usage guide' }
+    },
+    {
+      helpArg: 'help',
+    }
+  )
 
 const mkdir = promisify(fs.mkdir);
 
-//specify the test image to be analyzed
+// specify the test image to be analyzed //
 const testImgDir = './';
-const testImgName = '229.jpg';
-const testImgLabel = 1;
+const testImgName = args.testImgName;
+const testImgLabel = args.testImgLabel;
 const saveAnalysisPath = testImgDir;
 const testImgPath = path.join(testImgDir, testImgName);
 
-//load the model
-const loadModelDir = './models-epoch20/epoch20-final/'
+// load the model //
+const loadModelDir = `./models-client${args.clientNumber}/epoch${args.epochNumber}-final/`
 const loadModelName = 'model.json'
 const loadModelPath = path.join(loadModelDir, loadModelName)
-
-//specify epoch number
-const epochNum = 20; // Do we need this even??
 
 console.log('Load model from', loadModelPath)
 
@@ -30,16 +57,16 @@ const ppnet = await tf.loadLayersModel(`file://${loadModelPath}`)
 
 const cfg = {
     imgSize: 224,
-    prototypeShape: [20, 1, 1, 128],
-    numProt: 20,
-    numClasses: 2
+    numProt: 10*args.numClasses,
+    numClasses: args.numClasses,
+    prototypeShape: [10*args.numClasses, 1, 1, 128]
 }
 const config = Object.assign({}, cfg);
 
-//SANITY CHECK
+// SANITY CHECK //
 // confirm prototype class identity
-const loadProtDir = './epoch-20/' // directory with saved prototypes
-const protInfoPath = path.join(loadProtDir, `prot_bb20.json`) // check the dir
+const loadProtDir = `./prots-client${args.clientNumber}/epoch-${args.epochNumber}/` // directory with saved prototypes
+const protInfoPath = path.join(loadProtDir, `prot_bb${args.epochNumber}.json`)
 
 const prototypeInfoJSON = fs.readFileSync(protInfoPath, 'utf-8');
 const prototypeInfo = JSON.parse(prototypeInfoJSON);
@@ -57,9 +84,9 @@ if (prototypeInfo) {
     console.log("Failed to load or parse the JSON data.");
 };
 
-//confirm that a prototype connects most strongly to its own class
+// confirm that a prototype connects most strongly to its own class //
 const lastLayer = ppnet.getLayer('logits');
-const lastLayerWeights = lastLayer.weights[0].read() //check index!!!
+const lastLayerWeights = lastLayer.weights[0].read()
 //console.log('lastLayerWeights: ', lastLayerWeights)
 const protMaxConnection = tf.argMax(lastLayerWeights, 1)
 
@@ -78,16 +105,9 @@ if (sum === config.numProt){
     console.log('WARNING: Not all prototypes connect most strongly to their respective classes.')
 }
 
-// HELPER FUNCTION FOR PLOTTING
-// maybe we don't need them
+// HELPER FUNCTION FOR PLOTTING //
 
-// function preprocess()
-// function preprocessInputFunction()
-// function undoPreprocess()
-// function undoPreprocessInputFunction()
-// function savePreprocessedImg()
-
-function saveProt(fileName: string, epoch: number, index: number): void{
+function saveProt(fileName: string, index: number): void{
     const imgPath = path.join(loadProtDir, `prot${index}.png`)
     sharp(imgPath).toFile(fileName).then(() => {
             console.log('Image saved successfully!');
@@ -96,7 +116,7 @@ function saveProt(fileName: string, epoch: number, index: number): void{
         });
 };
 
-function saveProtSelfAct(fileName: string, epoch: number, index: number): void{
+function saveProtSelfAct(fileName: string, index: number): void{
     const imgPath = path.join(loadProtDir, `prot-original_with_self_act${index}.png`)
     sharp(imgPath).toFile(fileName).then(() => {
             console.log('Image saved successfully!');
@@ -105,7 +125,7 @@ function saveProtSelfAct(fileName: string, epoch: number, index: number): void{
         });
 };
 
-async function saveProtOriginalWithBBox(fileName: string, epoch: number, index: number, bBoxHeightStart: number,
+async function saveProtOriginalWithBBox(fileName: string, index: number, bBoxHeightStart: number,
     bBoxHeightEnd: number, bBoxWidthStart: number, bBoxWidthEnd: number, color: number, thickness: number): Promise<void> {
         const imgPath = path.join(loadProtDir, `prot-original${index}.png`) 
         try {
@@ -113,7 +133,7 @@ async function saveProtOriginalWithBBox(fileName: string, epoch: number, index: 
             let image = await Jimp.read(imgBuffer);
             image = image.resize(config.imgSize, config.imgSize)
     
-            // Draw the rectangle (from ChatGPT)
+            // Draw the rectangle (from ChatGPT) //
             image.scan(bBoxWidthStart, bBoxHeightStart, bBoxWidthEnd - bBoxWidthStart, bBoxHeightEnd - bBoxHeightStart, function(x, y, idx) {
                 // Edge detection to draw only the border of the rectangle with the specified thickness
                 if (x <= bBoxWidthStart + thickness || x >= bBoxWidthEnd - thickness || y <= bBoxHeightStart + thickness || y >= bBoxHeightEnd - thickness) {
@@ -138,7 +158,7 @@ async function imsaveWithBBox (fileName: string, bBoxHeightStart: number,
             let image = await Jimp.read(imgBuffer);
             image = image.resize(config.imgSize, config.imgSize)
             
-            // Draw the rectangle (from ChatGPT)
+            // Draw the rectangle (from ChatGPT) //
             image.scan(bBoxWidthStart, bBoxHeightStart, bBoxWidthEnd - bBoxWidthStart, bBoxHeightEnd - bBoxHeightStart, function(x, y, idx) {
                 // Edge detection to draw only the border of the rectangle with the specified thickness
                 if (x <= bBoxWidthStart + thickness || x >= bBoxWidthEnd - thickness || y <= bBoxHeightStart + thickness || y >= bBoxHeightEnd - thickness) {
@@ -155,7 +175,7 @@ async function imsaveWithBBox (fileName: string, bBoxHeightStart: number,
     }
 };
 
-// load the test image and forward it through the network
+// load the test image and forward it through the network //
 async function preprocess(imgPath: string) {
     try {
         // Load the image with jimp
@@ -174,12 +194,6 @@ async function preprocess(imgPath: string) {
     }
 };
 
-/*(async () => {
-  const buffer = fs.readFileSync(testImgPath);
-  const type = await FileType.fromBuffer(buffer);
-  console.log(type);
-})();*/
-
 const imgTest = await preprocess(testImgPath);
 console.log(imgTest)
 let imgVariable = tf.tensor4d([0], [1, 1, 1, 1]);
@@ -195,21 +209,15 @@ const minDist = output[0].slice([0, cfg.numClasses], [-1, cfg.prototypeShape[0]]
 //console.log('minDist: ', minDist)
 const protoDist = output[1];
 
-//const distToSimLayer = ppnet.getLayer('distance_to_similarity')
-//const protActivations = distToSimLayer.apply(minDist) as tf.Tensor;
-//const protActPatterns = distToSimLayer.apply(protoDist) as tf.Tensor;
-
 const epsilon = 1e-7;
 const protActivations = tf.log(tf.div(tf.add(minDist, 1), tf.add(minDist, epsilon)));
 const protActPatterns = tf.log(tf.div(tf.add(protoDist, 1), tf.add(protoDist, epsilon)));
 console.log('protActPatterns: ', protActPatterns)
 
-// something for a linear prot activation function
-
 const argMaxResults = tf.argMax(logits, 1);
 let tables: [number, number][] = [];
 
-// Loop over each element in the logits tensor's first dimension
+// Loop over each element in the logits tensor's first dimension //
 for (let i = 0; i < logits.shape[0]; i++) {
     const maxIndex = await argMaxResults.data();
     const label = await labelTest.data();
@@ -237,7 +245,7 @@ for (let i=1; i<11; i++){
     console.log(`top ${i} activated prototype for this image:`);
     let savePath = path.join(saveAnalysisPath, 'most_activated_prototypes',
                                 `top-${i}_activated_prototype.png`)
-    saveProt(savePath, epochNum, actSortedIndices[i])
+    saveProt(savePath, actSortedIndices[i])
 
     const bBoxHeightStart = prototypeInfo[actSortedIndices[i]][1];
     const bBoxHeightEnd = prototypeInfo[actSortedIndices[i]][2];
@@ -245,12 +253,12 @@ for (let i=1; i<11; i++){
     const bBoxWidthEnd = prototypeInfo[actSortedIndices[i]][4]
     savePath = path.join(saveAnalysisPath, 'most_activated_prototypes',
         `top-${i}_activated_prototype_in_original_img.png`)
-    saveProtOriginalWithBBox(savePath, epochNum, actSortedIndices[i], bBoxHeightStart, bBoxHeightEnd,
+    saveProtOriginalWithBBox(savePath, actSortedIndices[i], bBoxHeightStart, bBoxHeightEnd,
         bBoxWidthStart, bBoxWidthEnd, 0, 2) // check color and thickness
 
     savePath = path.join(saveAnalysisPath, 'most_activated_prototypes',
         `top-${i}_activated_prototype_self_act.png`)
-    saveProtSelfAct(savePath, epochNum, actSortedIndices[i]);
+    saveProtSelfAct(savePath, actSortedIndices[i]);
 
     console.log(`prototype index: ${actSortedIndices[i]}`);
     console.log(`prototype class identity ${prototypeImgIdentity[actSortedIndices[i]]}`);
