@@ -11,7 +11,7 @@ import { parse } from 'ts-command-line-args'
 interface analysisArguments {
     testImgName: string
     testImgLabel: number
-    clientNumber: number
+    clientNumber: string
     epochNumber: number
     numClasses: number
   }
@@ -26,7 +26,7 @@ const args = parse<BenchmarkAnalysisArguments>(
     {
       testImgName: { type: String, alias: 'i', description: 'Name of an image to analyse'},
       testImgLabel: { type: Number, alias: 'l', description: 'Label of the test image'},
-      clientNumber: { type: Number, alias: 'n', description: 'Index number of the client which model will be used for analysis, for local models use the default value', defaultValue: 0 },
+      clientNumber: { type: String, alias: 'n', description: 'Index number of the client which model will be used for analysis, or Local for local models'},
       epochNumber: { type: Number, alias: 'e', description: 'Number of epochs used for training', defaultValue: 10 },
       numClasses: { type: Number, alias: 'c', description: 'Number of classes in the dataset', defaultValue: 2 },
       help: { type: Boolean, optional: true, alias: 'h', description: 'Prints this usage guide' }

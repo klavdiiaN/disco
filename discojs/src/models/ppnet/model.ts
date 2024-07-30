@@ -318,13 +318,13 @@ class PPNetModel extends tf.LayersModel {
    *
    * @param dataset - training dataset
    * @param args - training arguments
-   * @param clientNumber - index number of the currently training client (necessary to save the model and prototypes to a corresponding folder)
+   * @param clientNumber - index number of the currently training client (necessary to save the model and prototypes to a corresponding folder) or a string 'Local' for local training
    * @param pushDataset - dataset to perform push operation (optional)
    */
     async fitDataset<T> (
       dataset: Dataset<T>,
       args: tf.ModelFitDatasetArgs<T>,
-      clientNumber?: number,
+      clientNumber?: number | string,
       pushDataset?: Dataset<T>,
     ): Promise<tf.History> {
       const config = { ...this.config, ...args }

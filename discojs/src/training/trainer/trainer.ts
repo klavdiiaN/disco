@@ -49,7 +49,7 @@ export abstract class Trainer {
   async *fitModel(
     dataset: tf.data.Dataset<tf.TensorContainer>,
     valDataset: tf.data.Dataset<tf.TensorContainer>,
-    clientNumber?: number,
+    clientNumber?: number | string,
     pushDataset?: tf.data.Dataset<tf.TensorContainer>,
   ): AsyncGenerator<RoundLogs> {
     if (this.training !== undefined) {

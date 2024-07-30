@@ -46,7 +46,7 @@ export abstract class Model implements Disposable{
     trainingData: Dataset,
     validationData?: Dataset,
     epochs?: number,
-    clientNumber?: number,
+    clientNumber?: number | string,
     pushData?: Dataset
   ): AsyncGenerator<EpochLogs, void>;
 

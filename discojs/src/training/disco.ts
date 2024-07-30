@@ -85,7 +85,7 @@ export class Disco {
    * @param dataTuple The data tuple
    */
   // TODO RoundLogs should contain number of participants but Trainer doesn't need client
-  async *fit(dataTuple: data.DataSplit, clientNumber: number | undefined=0, dataPush?: data.DataSplit, dataVal?: data.DataSplit): AsyncGenerator<RoundLogs & { participants: number }> {
+  async *fit(dataTuple: data.DataSplit, clientNumber: number | string | undefined=0, dataPush?: data.DataSplit, dataVal?: data.DataSplit): AsyncGenerator<RoundLogs & { participants: number }> {
     this.logger.success("Training started.");
 
     const trainData = dataTuple.train.preprocess().batch();

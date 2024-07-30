@@ -37,7 +37,7 @@ function resolveConfig (config: ppnetConfig): Required<ppnetConfig> {
  * @param epoch - current epoch number
  * @param callbacks - callback functions for communication
  * @param evalDs - validation dataset
- * @param clientNumber - index number of the currently training client (necessary to save the model and prototypes to the corresponding folder)
+ * @param clientNumber - index number of the currently training client (necessary to save the model and prototypes to the corresponding folder) or a string 'Local' for local training
  * @params pushDs - dataset for push operation (optional)
  */
 export async function train (
@@ -47,7 +47,7 @@ export async function train (
     epoch: number,
     callbacks: TrainingCallbacks,
     evalDs: tf.data.Dataset<{ xs: tf.Tensor3D, ys: tf.Tensor1D }>,
-    clientNumber: number | undefined=0,
+    clientNumber: number | string | undefined=0,
     pushDS?: tf.data.Dataset<{ xs: tf.Tensor3D, ys: tf.Tensor1D }>,
 ): Promise<void>{
     const config = resolveConfig(cfg);

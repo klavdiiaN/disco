@@ -15,7 +15,7 @@ async function runUser(
   task: Task,
   url: URL,
   data: data.DataSplit,
-  clientNumber: number | undefined=0, // needed to save prototypes into client-specific folders
+  clientNumber: number | string | undefined=0, // needed to save prototypes into client-specific folders
   dataPush?: data.DataSplit, // not modified training data, i.e. not augmented
   dataVal?: data.DataSplit   // separate validation set
 ): Promise<List<RoundLogs>> {
@@ -37,7 +37,7 @@ async function runUser(
 
 // parameter dirMain should contain separate data folders for each of collaborating clients 
 async function main (task: Task, numberOfUsers: number, dirMain: string, numClasses?: number, push?: boolean, val?: boolean): Promise<void> {
-  console.log(`Started federated training of ${task.id}`)
+  console.log(`Started federated training of ppnet`)
   console.log({ args })
   const [server, url] = await startServer(numClasses);
 
@@ -61,25 +61,38 @@ async function main (task: Task, numberOfUsers: number, dirMain: string, numClas
     for (let i=0; i<dataPaths.length; i++){
       const dataPush = await getPpnetDataPush(task, dataPaths[i]);
       dataAllPush.push(dataPush);
-  };
-}
+    };
+  }
 
   if (val){
     for (let i=0; i<dataPaths.length; i++){
       const dataVal = await getPpnetDataVal(task, dataPaths[i]);
       dataAllVal.push(dataVal);
-  };
-}
-
-  const logs = await Promise.all(
-    Range(0, numberOfUsers).map(async (userIndex) => 
-      await runUser(task, url, dataAll[userIndex], userIndex, dataAllPush[userIndex], dataAllVal[userIndex])).toArray()
-  )
-  if (args.save) {
-    const fileName = `${task.id}_${numberOfUsers}users.csv`;
-    await fs.writeFile(fileName, JSON.stringify(logs, null, 2));
+    };
   }
 
+  if (numberOfUsers > 1){
+    const logs = await Promise.all(
+      Range(0, numberOfUsers).map(async (userIndex) => 
+        await runUser(task, url, dataAll[userIndex], userIndex, dataAllPush[userIndex], dataAllVal[userIndex])).toArray()
+    )
+  
+    if (args.save) {
+      const fileName = `${task.id}_${numberOfUsers}users.csv`;
+      await fs.writeFile(fileName, JSON.stringify(logs, null, 2));
+    }}
+    else if (numberOfUsers === 1){
+      const logs = await Promise.all(
+        Range(0, numberOfUsers).map(async (userIndex) => 
+          await runUser(task, url, dataAll[userIndex], 'Local', dataAllPush[userIndex], dataAllVal[userIndex])).toArray()
+      )
+    
+      if (args.save) {
+        const fileName = `${task.id}_${numberOfUsers}users.csv`;
+        await fs.writeFile(fileName, JSON.stringify(logs, null, 2));
+      }
+    }
+  
   console.log('Shutting down the server...')
   await new Promise((resolve, reject) => {
     server.once('close', resolve)
