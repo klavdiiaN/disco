@@ -83,10 +83,10 @@ export class MeanAggregator extends Aggregator<WeightsContainer> {
       console.log('How many results: ', a.shape)
     })*/
 
-    const modelWeights = this.model?.weights.weights;
+    /*const modelWeights = this.model?.weights.weights;
     if (modelWeights != undefined){modelWeights.forEach(a => {
       console.log('Model weights: ', a.shape)
-    })}
+    })}*/
     
     if (this.model !== undefined)      
       this.model.weights = result;

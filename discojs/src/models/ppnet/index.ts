@@ -24,7 +24,6 @@ export class PPNet extends Model {
             prototypeShape: [numProts, 1, 1, 128],
             featureShape: [7, 7, 2048], // shape of the final convolutional output of the MobileNetV2 model
             pretrainedPath: 'https://storage.googleapis.com/deai-313515.appspot.com/models/mobileNetV2_35_alpha_2_classes/model.json',
-            //pretrainedPath: 'file://../model_cardio/model.json',
             numClasses: numClasses,
             batchSizeTrain: 80,
             batchSizeEval: 127,

@@ -1,7 +1,16 @@
+// This script implements prototypes projection to the nearest latent patch //
+// Adapted from https://github.com/cfchen-duke/ProtoPNet 
+
+/* 
+-- Feed the image through the convolutional layers
+-- Compute the distance between each prototype and each latent patch
+-- Update the prototypes with the values of the their nearest patches
+-- Save the prototypes as the most activated regions in the images using receptive field information of the nearest latent patches to these prototypes
+*/
+
 import { L2Convolution_} from './model.js';
 import * as tf from '@tensorflow/tfjs-node'
 import * as fs from 'fs';
-import sharp from 'sharp';
 import * as path from 'path';
 import { promisify } from 'util';
 import { getProtoClassIdx } from './utils.js'
@@ -23,52 +32,56 @@ function extractConvInfo(model: tf.LayersModel) {
         // Extract the configuration of the layer
         const config = layer.getConfig();
 
-            // Extract and save specific properties
-            //const kernelSize = (config as any).kernelSize;
-            //if (Array.isArray(kernelSize)) {
-                //filterSizes.push(kernelSize[0] as number); // Assuming kernelSize is an array [height, width]
-            //};
-            /*if (typeof kernelSize === 'number'){
-                filterSizes.push(kernelSize)
-            };
-
-            const strides = (config as any).strides;
-            if (Array.isArray(strides)) {
-                strides.push(strides[0]); // Assuming strides is an array [height, width]
-            } else {
-                strides.push(strides);
-            }
-
-            paddings.push((config as any).padding); */
-        
-        //const config = layer.getConfig();
-
         // Extract and save specific properties
         filterSizes.push(config.kernelSize);
         strides.push(config.strides);
         paddings.push(config.padding)
     }
 })
-
     return [filterSizes, strides, paddings]
 };
 
-async function pushPrototypes (cfg: any,
-    dataset: tf.data.Dataset<{ xs: tf.Tensor3D, ys: tf.Tensor1D }>, model: tf.LayersModel,
+/**
+ * This function performs the projection of prototypes on their nearest latent patches for visualization. 
+ * Optionally, it also updates the prototypes with the values of their nearest latent patches.
+ * 
+ * @param cfg - model config
+ * @param dataset - training or push dataset
+ * @param model - trained model as tf.LayersModel
+ * @param preprocessInputFunction - function to preprocess the images (in DISCO, data is preprocessed automatically so this parameter may be removed) 
+ * @param prototypeLayerStride -  value of the stride of the prototype layer (coming from the receptive field information)
+ * @param rootDirForSavingProts - directory to save prototypes
+ * @param epochNumber - current epoch number
+ * @param protImgFilePrefix - prefix to name saved prototypes
+ * @param protSelfActFilePrefix - prefix to name saved self activations of the prototypes (a.k.a. heatmaps)
+ * @param protBoundBoxFilePrefix - prefix to name saved images with prototypes as rectangular regions
+ * @param saveProtClassId - boolean to indicate if we need to save prototypes class identity
+ * @param update - boolean to indicate if we need to update the prototypes with the values of their nearest latent patches
+ * @param clientNumber - index number of the currently active client (necessary for saving prototypes in the client-corresponding folder) or a string 'Local' for local training
+ */
+
+async function pushPrototypes (
+    cfg: any,
+    dataset: tf.data.Dataset<{ xs: tf.Tensor3D, ys: tf.Tensor1D }>, 
+    model: tf.LayersModel,
     preprocessInputFunction: Function | null = null,
-    prototypeLayerStride: number=1, rootDirForSavingProts: string | null=null,
-    epochNumber: number | null=null, protImgFilePrefix: string | null=null,
-    protSelfActFilePrefix: string, protBoundBoxFilePrefix: string | null=null, 
+    prototypeLayerStride: number=1, 
+    rootDirForSavingProts: string | null=null,
+    epochNumber: number | null=null, 
+    protImgFilePrefix: string | null=null,
+    protSelfActFilePrefix: string, 
+    protBoundBoxFilePrefix: string | null=null, 
     saveProtClassId: boolean = true,
     update: boolean = true,
-    clientNumber: number | undefined=0): Promise<void> {
+    clientNumber: number | string | undefined=0): Promise<void> {
 
     const config = Object.assign({}, cfg);
     const numPrototypes = config.prototypeShape[0];
     const prototypeShape = config.prototypeShape;
     const numClasses = config.numClasses;
+    // initialize an array of minimum distances
     let globalMinProtoDist: number[] = new Array(numPrototypes).fill(Infinity);
-    //let globalMinProtoDist = tf.fill([numPrototypes], Infinity);
+    // initialize an array of patches corresponding to minimum distances
     let globalMinFmapPatches = Array.from({length: numPrototypes}, () =>
         Array.from({length: prototypeShape[1]}, () =>
           Array.from({length: prototypeShape[2]}, () =>
@@ -76,12 +89,10 @@ async function pushPrototypes (cfg: any,
           )
         )
       );
-    //console.log('globalMinFmapPatches before update:', globalMinFmapPatches[0][0][0])
-    //let globalMinFmapPatches = tf.zeros([numPrototypes, prototypeShape[1], prototypeShape[2], prototypeShape[3]]);
 
-    // Initialize proto_rf_boxes and proto_bound_boxes based on class identity requirement
+    // Initialize protoRfBoxes (receptive field boxes) and protoBoundBoxes (actual bounding boxes) based on class identity requirement (if it's saved or not)
     let protoRfBoxes: number[][], protoBoundBoxes: number[][];
-    if (saveProtClassId) {
+    if (saveProtClassId) { 
         protoRfBoxes = Array.from({length: numPrototypes}, () => Array(6).fill(-1));
         protoBoundBoxes = Array.from({length: numPrototypes}, () => Array(6).fill(-1));
     } else {
@@ -91,7 +102,6 @@ async function pushPrototypes (cfg: any,
     let protoEpochDir = rootDirForSavingProts;
     if (rootDirForSavingProts) {
         if (epochNumber) {
-        //const timestamp = new Date().getTime(); 
         protoEpochDir = path.join(rootDirForSavingProts, `prots-client${clientNumber}/epoch-${epochNumber}`); //
         await mkdir(protoEpochDir, { recursive: true });
         }
@@ -101,6 +111,7 @@ async function pushPrototypes (cfg: any,
 
     // compute conv layer receptive field information
     const [filterSizes, strides, paddings] = extractConvInfo(model);
+    // compute receptive field information
     const protoLRfInfo = computeProtoLayerRfInfo(
         config.imgSize,
         filterSizes,
@@ -110,16 +121,13 @@ async function pushPrototypes (cfg: any,
     );
     //console.log('RF info:', protoLRfInfo);
 
+    // iterate over batches searching for the nearest latent patch to a prototype
     await dataset.forEachAsync((batch) => {
-        //console.log('Start for each');
         try{
         const searchBatchInput = batch.xs;
         const labels = batch.ys;
-        //labels.print()
-        const searchY = labels.argMax(1);
-        //searchY.print()
-        //const [searchBatchInput, searchY] = batch as [tf.Tensor, tf.Tensor];
-        let startIndexOfSearchBatch = pushIter * searchBatchSize;
+        const searchY = labels.argMax(1); // because labels are one-hot encoded
+        let startIndexOfSearchBatch = pushIter * searchBatchSize; // we need to keep track of all images in the push dataset to find one which has the nearest latent patch
         console.log('Start prototype updating')
 
         updatePrototypeOnBatch(config, 
@@ -137,12 +145,10 @@ async function pushPrototypes (cfg: any,
             protoEpochDir, 
             protImgFilePrefix,
             protSelfActFilePrefix,
-            //'log',
             protoLRfInfo, 
             1e-4);
             pushIter += 1;
             console.log('Batch processing complete');
-            //throw new Error('This is an error');
         } catch (error) {
             console.error('Error processing batch:', error);
         }
@@ -157,12 +163,11 @@ async function pushPrototypes (cfg: any,
 
 //console.log('globalMinFmapPatches after update:', globalMinFmapPatches[0][0][0])
   console.log('\tExecuting push ...');
-  if (update) {
+  if (update) { // replace the prototypes with the values of the their nearest latent patches
     const globalMinFmapPatchesTensor = tf.tensor(globalMinFmapPatches);
     //console.log('globalMinFmapPatchesTensor:', globalMinFmapPatchesTensor)
     const prototypeUpdate: tf.Tensor = globalMinFmapPatchesTensor.reshape([prototypeShape[1], prototypeShape[2], prototypeShape[3], numPrototypes]);
     //console.log('update:', prototypeUpdate)
-    // finish //
     const convLayer = model.getLayer('l2_convolution')
     if (convLayer instanceof L2Convolution_) {
         convLayer.protVectors = prototypeUpdate;
@@ -171,7 +176,30 @@ async function pushPrototypes (cfg: any,
   console.log('prototypes updated')
 };
 
-async function updatePrototypeOnBatch(cfg: ppnetConfig, 
+/**
+ * This function performs the search for the nearest latent patches and saves them as the prototypes.
+ * 
+ * @param cfg - model config
+ * @param searchBatchInput - data batch to search for the nearest latent patch
+ * @param model - trained model as tf.LayersModel
+ * @param startIndexOfSearchBatch -  the current batch starting image's index in the entire push dataset
+ * @param globalMinProtoDist - current smallest distances
+ * @param globalMinFmapPatches - patches corresponding to the current smallest distances
+ * @param protoRfBoxes - receptive field boxes of the prototypes 
+ * @param protoBoundBoxes - bounding boxes of the prototypes
+ * @param searchLabel - labels of the images in the current batch
+ * @param numClasses - number of classes
+ * @param preprocessInputFunction - function to preprocess the images (in DISCO, data is preprocessed automatically so this parameter may be removed) 
+ * @param prototypeLayerStride - value of the stride of the prototype layer (coming from the receptive field information)
+ * @param dirForSavingProts - directory to save prototypes
+ * @param protImgFilePrefix - prefix to name saved prototypes
+ * @param protSelfActFilePrefix - prefix to name saved self activations of the prototypes (a.k.a. heatmaps)
+ * @param protoLRfInfo - receptive field information
+ * @param epsilon - a very small number to avoid devision by zero
+ */
+
+async function updatePrototypeOnBatch(
+    cfg: ppnetConfig, 
     searchBatchInput: tf.Tensor,
     model: tf.LayersModel,
     startIndexOfSearchBatch: number = 0, 
@@ -186,7 +214,6 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
     dirForSavingProts: string | null=null, 
     protImgFilePrefix: string | null=null,
     protSelfActFilePrefix: string, 
-    //prototypeActivationFunction: string | null,
     protoLRfInfo: number[], 
     epsilon: number = 1e-4){
         let searchBatch: tf.Tensor;
@@ -195,19 +222,18 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
             searchBatch = preprocessInputFunction(searchBatchInput)
         } else {searchBatch = searchBatchInput}
 
-        // reimplement this with a model
-        //let protoLInput!: tf.Tensor;
+        // get the prediction for the batch and separate obtained distances and the output of the convolutional layers
         const output = model.predict(searchBatch) as tf.Tensor[];
         const protoDist = output[1];
         const protoLInput = output[2];
         //console.log('Distances:', protoDist)
-        //console.log('proto l input:', protoLInput)     
 
         // convert tf.Tensor to an Array to simplify following computations 
         const dataY = await searchLabel.data()
         //console.log('dataY:', dataY);
         const searchY = Array.from(dataY);
         //console.log('searchY:', searchY)
+        // initialize an array of indices of images in each class
         const classToImgIndexArray: number[][] = Array.from({ length: numClasses }, () => []);
         searchY.forEach((imgLabel, imgIndex) => {
             classToImgIndexArray[imgLabel].push(imgIndex);
@@ -216,40 +242,37 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
 
         const prototypeShape = cfg.prototypeShape;
         const numPrototypes = prototypeShape[0];
-        const protoH = prototypeShape[1];
-        const protoW = prototypeShape[2];
-        const maxDist = prototypeShape[1] * prototypeShape[2] * prototypeShape[3];
+        const protoH = prototypeShape[1]; // height
+        const protoW = prototypeShape[2]; // width
 
+        // iterate over all prototypes and find the nearest latent patches in the current batch
         for (let j=0; j<numPrototypes; j++){
-            const protoClassId = getProtoClassIdx(cfg).slice([j]);
+            const protoClassId = getProtoClassIdx(cfg).slice([j]); // get the class to which this prototype belongs (a one-hot encoded tensor) and convert it into a number
             const targetClassTensor = protoClassId.argMax(1);
             const targetClassData = await targetClassTensor.data();
             const targetClass = targetClassData[0];
-            if (classToImgIndexArray[targetClass].length === 0){continue}
+            if (classToImgIndexArray[targetClass].length === 0){continue} // if there are no images of this class in this batch, move to the next prototype
 
-            const indicesForTargetClass = tf.tensor1d(classToImgIndexArray[targetClass], 'int32');
-            //console.log('Indices for target classes:', indicesForTargetClass);
-            //indicesForTargetClass.data().then(data => {
-                //console.log(data)});
+            const indicesForTargetClass = tf.tensor1d(classToImgIndexArray[targetClass], 'int32'); // get indices of the images in the batch which belong to the prototype class
 
-            // Gather slices from protoDist along the first dimension based on indicesForTargetClass
+            // get the distances between the image patches in the batch and the current prototype
             const gathered = tf.gather(protoDist, indicesForTargetClass, 0);
             //console.log('Proto dist:', protoDist)
             //console.log('Gathered:', gathered);
 
-            // Now, slice to keep only index j along the second dimension, and all elements along the third and fourth dimensions
+            // Now, slice to keep only index j (current prototype) along the second dimension, and all elements along the third and fourth dimensions
             const begin = [0, 0, 0, j];
             const size = [-1, -1, -1, 1]; // -1 means all elements along that dimension
 
             const protoDistJ = gathered.slice(begin, size);
             //console.log('ProtoDistJ:', protoDistJ);
 
-            const batchMinProtoDistJTensor = tf.min(protoDistJ);
+            const batchMinProtoDistJTensor = tf.min(protoDistJ); // get the minimum distance (a tensor) and convert it into a number
             const batchMinProtoDistJData = await batchMinProtoDistJTensor.data();
             let batchMinProtoDistJ = batchMinProtoDistJData[0];
             //console.log(batchMinProtoDistJ)
 
-            if (batchMinProtoDistJ < globalMinProtoDist[j]){
+            if (batchMinProtoDistJ < globalMinProtoDist[j]){ 
                 const flatIndexData = await protoDistJ.argMin().data();
                 const flatIndex = flatIndexData[0];
                 const shape = protoDistJ.shape;
@@ -284,7 +307,7 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
                 const sizeForHeight = fmapHeightEndIndex - fmapHeightStartIndex;
                 const sizeForWidth = fmapWidthEndIndex - fmapWidthStartIndex;
 
-                // Perform the slicing
+                // We slice the nearest patch from the entire convolutional output (a tensor) and convert it into an array
                 const batchMinFmapPatchJTensor = protoLInput.slice(
                     [imgIndexInBatch, fmapHeightStartIndex, fmapWidthStartIndex, 0],
                     [1, sizeForHeight, sizeForWidth, -1]
@@ -295,11 +318,8 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
                     batchMinFmapPatchJ = array as number[][][];
                     globalMinFmapPatches[j]  = batchMinFmapPatchJ;
                 })
-
-                // Note: After slicing, you might want to remove the singleton dimension caused by img_index_in_batch
-                //const squeezedPatch = batchMinFmapPatchJ.squeeze([0]);
                 
-                globalMinProtoDist[j] = batchMinProtoDistJ;
+                globalMinProtoDist[j] = batchMinProtoDistJ; // update the currently nearset patch
 
                 //get the receptive field boundary of the image patch that generates the representation
                 let searchBatchShape: number = 224;
@@ -314,7 +334,6 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
                 let originalImgJ = searchBatchInputClone.slice([rfPrototypej[0], 0, 0, 0],[1, -1, -1, -1]);
                 const normImage = originalImgJ.sub(originalImgJ.min())
                                   .div(originalImgJ.max().sub(originalImgJ.min()));
-                //originalImgJ = tf.transpose(normImage, [2, 3, 1]);
                 originalImgJ = normImage.squeeze();
 
                 //console.log('Original image:', originalImgJ)
@@ -330,7 +349,7 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
 
                 // Perform the slicing
                 // tf.slice() takes the tensor to slice, an array of starting indices, and an array of sizes for each dimension
-                const rfImgJ = tf.slice(originalImgJ, [rfPrototypej[1], rfPrototypej[3], 0], [heightSize, widthSize, -1]); // I don't save it later
+                const rfImgJ = tf.slice(originalImgJ, [rfPrototypej[1], rfPrototypej[3], 0], [heightSize, widthSize, -1]); // we don't save it later but may consider it if needed
 
                 //save the prototype receptive field information
                 protoRfBoxes[j][0] = rfPrototypej[0] + startIndexOfSearchBatch;
@@ -344,27 +363,24 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
                     protoRfBoxes[j][5] = searchY[rfPrototypej[0]]
                 };
 
-                //find the highly activated region of the original image
+                //find the most activated region in the original image
                 const height = protoDist.shape[1]!;
                 const width = protoDist.shape[2]!;
                 const protoDistImgJ = protoDist.slice([imgIndexInBatch, 0, 0, j], [1, height, width, 1]);
                 
                 let protoActImgJ: tf.Tensor;
-                protoActImgJ = tf.log(tf.div(tf.add(protoDistImgJ, 1), tf.add(protoDistImgJ, epsilon)))
+                protoActImgJ = tf.log(tf.div(tf.add(protoDistImgJ, 1), tf.add(protoDistImgJ, epsilon))) // apply activation function to convert distances into similarity scores
                 const protoActImgJSqueezed = protoActImgJ.squeeze();
-
+                
+                // upsample the most activated patch
                 const upsampledActImgJ = tf.image.resizeBilinear(protoActImgJSqueezed.expandDims(2) as tf.Tensor3D | tf.Tensor4D, [originalImgSize, originalImgSize]);
                 const upsampledActImgJSqueezed = upsampledActImgJ.squeeze([2]);
 
-                // Note: The input tensor protoActImgJ should be a 4D tensor of shape [batch, height, width, channels].
-                // If protoActImgJ is not 4D (e.g., a single image, 3D tensor), you need to expand its dimensions first:
-                // protoActImgJ = tf.expandDims(protoActImgJ, 0);
-                // And after resizing, you might want to remove the batch dimension if it's not needed:
-                // upsampledActImgJ = tf.squeeze(upsampledActImgJ, 0);
+                // enclose the most activated patch in an image in a rectangle
                 const protoBoundJ = await findHighActivationCrop(upsampledActImgJSqueezed);
                 //console.log('protoBoundJ:', protoBoundJ)
 
-                // crop out the image patch with high activation as prototype image
+                // crop out the image patch with high activation as a prototype image
                 const protoImgJ = tf.tidy(() => {
                     // Calculate the size of the slice for each dimension
                     const sizeHeight = protoBoundJ[1] - protoBoundJ[0];
@@ -417,7 +433,7 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
                         fs.writeFileSync(filePathProt, protData);
 
                         // overlay (upsampled) self activation on original image and save the result
-                        // implemented by ChatGPT, may not work well
+                        // implemented by ChatGPT, may not work well :)
                         let rescaledActImgJ = upsampledActImgJ.sub(upsampledActImgJ.min()).div(upsampledActImgJ.max().sub(upsampledActImgJ.min()));
                         const heatmapTensor = await applyJetColorMap(rescaledActImgJ);
                         const overlayedOriginalImgJ = scaledImg.mul(tf.scalar(0.5)).add(heatmapTensor.mul(tf.scalar(0.3)));
@@ -430,6 +446,13 @@ async function updatePrototypeOnBatch(cfg: ppnetConfig,
         }
     };
 
+/**
+ * This function encloses the most activated region in an image into a rectangle indicating a prototypical part.
+ * 
+ * @param activationMap - a tensor with similarity scores between image patches and a prototype
+ * @param percentile - an minimum intensity percentile to enclose in a rectangle
+ * 
+ */
 export async function findHighActivationCrop (activationMap: tf.Tensor, percentile: number = 95): Promise<number[]> {
     if (activationMap.rank !== 2) {
         throw new Error('Expected a 2D tensor');
@@ -469,6 +492,7 @@ export async function findHighActivationCrop (activationMap: tf.Tensor, percenti
     return [lowerY, upperY + 1, lowerX, upperX + 1];
 };
 
+// colors encoding for heatmaps //
 interface JetColor {
     value: number;
     color: [number, number, number]; // Tuple type for RGB colors
@@ -483,6 +507,7 @@ const jetColors: JetColor[] = [
     { value: 1, color: [128, 0, 0] } // Dark Red
 ];
 
+// the following two functions allow to visualize the most activated regions with color heatmaps, implemented by ChatGPT //
 function interpolateColor(value: number): [number, number, number] {
     let startColor: JetColor = jetColors[0]; // Default to the first color
     let endColor: JetColor = jetColors[jetColors.length - 1]; // Default to the last color
