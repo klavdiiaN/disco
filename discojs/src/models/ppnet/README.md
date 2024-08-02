@@ -17,7 +17,7 @@ After that, please, go to the `cli` folder:
 ````
 cd cli
 ````
-You are almost ready to run the script. Before, let's ensure that the dataset is ready. The dataset should be placed in the parent to DISCO directory and have the following organization:
+You are almost ready to run the script. Before, let's ensure that the dataset is ready. The dataset should be placed in the parent to DISCO directory and have the following structure:
 - 📁 dataset_directory
   - 📁 client_0
     - 📁 train
@@ -32,7 +32,7 @@ You are almost ready to run the script. Before, let's ensure that the dataset is
   - 📁 client_2
   - 📁 client_3
 
-You can experiment with different number of clients. Validation set is optional (it must have the same organization as the `train` folder). If it's not provided, 10% of the training data will be saved for validation. The `push` dataset is (a part of) training data and needed to visualize the prototypes. You may need to provide it separately if the training data has been augmented with image modifications such as flipping, rotating, etc. The `push` folder must also be organized as `train`.
+You can experiment with different number of clients. Validation set is optional (it must have the same organization as the `train` folder). If it's not provided, 10% of the training data will be saved for validation. The `push` dataset is (a part of) training data and necessary to visualize the prototypes. You may need to provide it separately if the training data has been augmented with image modifications such as flipping, rotation, etc. The `push` folder must also be organized as `train`.
 Now, you're ready to start.
 
 ### 💡 Training a global model in a federated setting
