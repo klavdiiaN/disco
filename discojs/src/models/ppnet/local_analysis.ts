@@ -1,3 +1,6 @@
+// This script implements the projection of prototypes on a test image to enable prototypes comparison.
+// We can visualize prototypes learned by different models (local and global) on the same local test image to compare clients' data without compromising their privacy.
+
 import * as tf from '@tensorflow/tfjs-node'
 import * as fs from 'fs';
 import sharp from 'sharp';

@@ -109,7 +109,7 @@ async function pushPrototypes (
     let pushIter = 0;
     let searchBatchSize = config.batchSizePush;
 
-    // compute conv layer receptive field information
+    // compute conv layer characteristics
     const [filterSizes, strides, paddings] = extractConvInfo(model);
     // compute receptive field information
     const protoLRfInfo = computeProtoLayerRfInfo(

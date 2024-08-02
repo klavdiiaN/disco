@@ -29,7 +29,7 @@ function resolveConfig (config: ppnetConfig): Required<ppnetConfig> {
  * - PUSH prototypes projection on the nearset latent patches
  * - LAST LAYER OPTIMIZATION only the final layer is trained
  * In the original implementation, there is also a WARM stage in the very beginning which trains only the additional convolutional layers. 
- * After that, during JOINT, the feature extractor weights are unfrozen and trained together with other layers whcih is not our case. So we don't implement WARM as a separate stage.
+ * After that, during JOINT, the feature extractor weights are unfrozen and trained together with other layers which is not our case. So we don't implement WARM as a separate stage.
  *
  * @param model - ProtoPNet to train
  * @param ds - training dataset
