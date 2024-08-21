@@ -52,7 +52,7 @@ For example, to train a model with 4 clients for 11 training epochs with 10 clas
 ````
 node dist/bias_detection.js -t ppnet -u 4 -e 11 -b 80 -c 10 -d ../../training_data/ -v
 `````
-For each client N, the script saves the trained model and visualized prototypes after every 10 training epochs into folders named `models-clientN` and `prots-clientN`, respectively.
+For each client N, the script saves the trained model and visualized prototypes after every 10 training epochs into folders named `models-clientN` and `prots-clientN`, respectively. It also writes the validation loss, balanced accuracy, sensitivity, and specificity values after each epoch into a JSON file named `results.json` in the folder `models-clientN`.
 
 ### 💡 Training a local model
 

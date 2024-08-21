@@ -6,6 +6,7 @@ import '@tensorflow/tfjs-backend-webgl';
 import type { ppnetConfig } from './config.js';
 import { DEFAULT_CONFIG } from './config.js';
 import type { TrainingCallbacks } from './types.js';
+import { saveResults } from './types.js';
 import { protoPartLoss, getProtoClassIdx } from './utils.js';
 import evaluate from './evaluate.js';
 import { pushPrototypes } from './pushPrototype.js';
@@ -57,6 +58,14 @@ export async function train (
     let logs: tf.Logs | undefined
     let loss;
 
+    // create directory to save models
+    const modelEpochDir = `../models-client${clientNumber}`
+    await mkdir(modelEpochDir, { recursive: true });
+
+    // create directory to save quantitative results
+    const saveDir = path.join(modelEpochDir, '/results.json')
+    const saveResultsJSON = new saveResults(saveDir);
+
     // freeze pretrained convolutional layers
     const freeze = model.getLayer('features');
     freeze.trainable = false;
@@ -93,10 +102,7 @@ export async function train (
     opt.dispose();
     
     // we perform push operation each 10 epochs
-    if (epoch > 0 && epoch%10 === 0){
-        const modelEpochDir = `../models-client${clientNumber}`
-        await mkdir(modelEpochDir, { recursive: true });
-        
+    if (epoch > 0 && epoch%10 === 0){     
         let fileName = path.join(modelEpochDir, `epoch${epoch}-beforePush`)
         await model.save(`file://${fileName}`);
         console.log('Before push model saved')
@@ -125,7 +131,7 @@ export async function train (
         console.log('LAST LAYER OPTIMIZATION');
         // optimize for some number of iterations
         for(let i=0; i<8; i++){
-            console.log(tf.memory());
+            //console.log(tf.memory());
             await ds.forEachAsync(async (batch) => {
                 const xs = batch.xs;
                 const ys = batch.ys;
@@ -164,4 +170,5 @@ export async function train (
         console.log('Final model saved')
         };
         await callbacks.onEpochEnd?.(epoch, logs)
+        await saveResultsJSON.onEpochEnd.bind(saveResultsJSON)(epoch, logs); // save results into a JSON file
     }
